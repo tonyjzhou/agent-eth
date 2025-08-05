@@ -25,9 +25,18 @@ impl EthereumAgent {
         let client = Client::new();
 
         let mut account_aliases = HashMap::new();
-        account_aliases.insert("alice".to_lowercase(), "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266".to_string());
-        account_aliases.insert("bob".to_lowercase(), "0x70997970C51812dc3A010C7d01b50e0d17dc79C8".to_string());
-        account_aliases.insert("carol".to_lowercase(), "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC".to_string());
+        account_aliases.insert(
+            "alice".to_lowercase(),
+            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266".to_string(),
+        );
+        account_aliases.insert(
+            "bob".to_lowercase(),
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8".to_string(),
+        );
+        account_aliases.insert(
+            "carol".to_lowercase(),
+            "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC".to_string(),
+        );
 
         Ok(Self {
             client,
@@ -89,13 +98,13 @@ Always respond with a JSON object describing the parsed command."#;
 
         let response_text = response.text().await?;
         let response_json: serde_json::Value = serde_json::from_str(&response_text)?;
-        
+
         let content = response_json["content"][0]["text"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Invalid response format"))?;
 
         let parsed: ParsedCommand = serde_json::from_str(content)?;
-        
+
         // Resolve aliases
         let mut resolved = parsed;
         if let Some(ref addr) = resolved.from_address {
@@ -120,9 +129,15 @@ Always respond with a JSON object describing the parsed command."#;
     pub fn get_private_key_for_address(&self, address: &str) -> Option<String> {
         // Predefined private keys for test accounts
         match address {
-            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" => Some("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string()),
-            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" => Some("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d".to_string()),
-            "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC" => Some("0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a".to_string()),
+            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" => Some(
+                "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string(),
+            ),
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" => Some(
+                "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d".to_string(),
+            ),
+            "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC" => Some(
+                "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a".to_string(),
+            ),
             _ => None,
         }
     }

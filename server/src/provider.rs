@@ -1,6 +1,6 @@
+use anyhow::Result;
 use ethers::providers::{Http, Middleware, Provider};
 use ethers::types::{Address, U256};
-use anyhow::Result;
 use std::str::FromStr;
 
 pub struct EthereumProvider {
@@ -20,7 +20,7 @@ impl EthereumProvider {
         } else {
             Address::from_str(address)?
         };
-        
+
         let balance = self.provider.get_balance(addr, None).await?;
         Ok(balance)
     }
@@ -31,12 +31,8 @@ impl EthereumProvider {
         } else {
             Address::from_str(address)?
         };
-        
+
         let code = self.provider.get_code(addr, None).await?;
         Ok(code.to_vec())
-    }
-
-    pub fn provider(&self) -> &Provider<Http> {
-        &self.provider
     }
 }

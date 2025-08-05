@@ -187,3 +187,6 @@ htmlcov/
 # Flamegraph outputs
 flamegraph.svg
 perf.data*
+
+
+CLAUDE.md

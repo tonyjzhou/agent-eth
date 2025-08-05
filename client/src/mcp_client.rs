@@ -11,7 +11,7 @@ pub struct McpClient {
 impl McpClient {
     pub fn new(server_url: &str) -> Self {
         info!("Connecting to MCP server at: {}", server_url);
-        
+
         Self {
             client: Client::new(),
             server_url: server_url.to_string(),
@@ -26,7 +26,7 @@ impl McpClient {
 
         let response = self
             .client
-            .post(&format!("{}/balance", self.server_url))
+            .post(format!("{}/balance", self.server_url))
             .json(&params)
             .send()
             .await?;
@@ -51,7 +51,7 @@ impl McpClient {
 
         let response = self
             .client
-            .post(&format!("{}/transfer", self.server_url))
+            .post(format!("{}/transfer", self.server_url))
             .json(&params)
             .send()
             .await?;
@@ -67,7 +67,7 @@ impl McpClient {
 
         let response = self
             .client
-            .post(&format!("{}/contract_check", self.server_url))
+            .post(format!("{}/contract_check", self.server_url))
             .json(&params)
             .send()
             .await?;

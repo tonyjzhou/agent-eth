@@ -11,14 +11,16 @@ pub async fn get_balance(
         Ok(balance) => {
             let result = if in_ether.unwrap_or(true) {
                 let ether_balance = utils::format_ether(balance);
-                format!("{} ETH", ether_balance)
+                format!("{ether_balance} ETH")
             } else {
-                format!("{} wei", balance)
+                format!("{balance} wei")
             };
             Ok(result)
         }
-        Err(e) => {
-            Err(anyhow::anyhow!("Failed to get balance for {}: {}", address, e))
-        }
+        Err(e) => Err(anyhow::anyhow!(
+            "Failed to get balance for {}: {}",
+            address,
+            e
+        )),
     }
 }
