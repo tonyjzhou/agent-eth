@@ -1,0 +1,25 @@
+[package]
+name = "agent-eth-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Ethereum interaction
+ethers = { version = "2.0", features = ["ws", "rustls"] }
+
+# HTTP server for MCP
+axum = "0.7"
+tower = "0.4"
+
+# Async utilities
+futures = "0.3"
+
+# Address and transaction types
+hex = "0.4"
