@@ -5,6 +5,8 @@ use alloy::signers::local::PrivateKeySigner;
 use anyhow::Result;
 use std::str::FromStr;
 
+// ENS support removed for simplicity - would require complex mainnet contract interactions
+
 pub struct EthereumProvider {
     rpc_url: String,
 }
@@ -18,10 +20,10 @@ impl EthereumProvider {
 
     pub async fn get_balance(&self, address: &str) -> Result<U256> {
         let addr = if address.ends_with(".eth") {
-            // For ENS names, manually resolve to address first
-            // TODO: Implement ENS resolution or return error for now
+            // For now, provide a helpful error message for ENS names
+            // ENS resolution requires proper mainnet connection and is complex to implement
             return Err(anyhow::anyhow!(
-                "ENS resolution not yet implemented in Alloy migration"
+                "ENS name resolution (*.eth) is not supported in this development version. Please use hex addresses instead."
             ));
         } else {
             Address::from_str(address)?
@@ -34,9 +36,9 @@ impl EthereumProvider {
 
     pub async fn get_code(&self, address: &str) -> Result<Vec<u8>> {
         let addr = if address.ends_with(".eth") {
-            // TODO: Implement ENS resolution or return error for now
+            // For now, provide a helpful error message for ENS names
             return Err(anyhow::anyhow!(
-                "ENS resolution not yet implemented in Alloy migration"
+                "ENS name resolution (*.eth) is not supported in this development version. Please use hex addresses instead."
             ));
         } else {
             Address::from_str(address)?
@@ -95,5 +97,46 @@ impl EthereumProvider {
         let _receipt = pending_tx.get_receipt().await?;
 
         Ok(format!("{tx_hash:#x}"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_provider_creation() {
+        let provider = EthereumProvider::new("http://127.0.0.1:8545");
+        assert!(provider.is_ok());
+    }
+
+    #[test]
+    fn test_ens_name_detection() {
+        let provider = EthereumProvider::new("http://127.0.0.1:8545").unwrap();
+
+        // Test that ENS names are properly detected and rejected with helpful error
+        let result = tokio_test::block_on(provider.get_balance("vitalik.eth"));
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("ENS name resolution"));
+    }
+
+    #[test]
+    fn test_invalid_address_format() {
+        let provider = EthereumProvider::new("http://127.0.0.1:8545").unwrap();
+
+        // Test invalid hex address
+        let result = tokio_test::block_on(provider.get_balance("invalid_address"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_valid_address_format() {
+        // Test that valid hex addresses are parsed correctly
+        let valid_address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+        let result = Address::from_str(valid_address);
+        assert!(result.is_ok());
     }
 }

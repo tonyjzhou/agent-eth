@@ -12,7 +12,13 @@
       "WebFetch(domain:docs.alloy.rs)",
       "Bash(cargo add:*)",
       "Bash(cargo:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(find:*)",
+      "WebFetch(domain:docs.rs)",
+      "Bash(lsof:*)",
+      "Bash(timeout 10 cargo run)",
+      "Bash(ls:*)",
+      "Bash(pkill:*)"
     ],
     "deny": []
   }

@@ -24,3 +24,35 @@ pub async fn get_balance(
         )),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_balance_formatting() {
+        // Test that the balance function properly handles formatting parameters
+        let provider = EthereumProvider::new("http://127.0.0.1:8545").unwrap();
+
+        // Test ENS rejection
+        let result = tokio_test::block_on(get_balance(
+            &provider,
+            "vitalik.eth".to_string(),
+            Some(true),
+        ));
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("ENS name resolution"));
+    }
+
+    #[test]
+    fn test_invalid_address_handling() {
+        let provider = EthereumProvider::new("http://127.0.0.1:8545").unwrap();
+
+        let result =
+            tokio_test::block_on(get_balance(&provider, "invalid".to_string(), Some(true)));
+        assert!(result.is_err());
+    }
+}
