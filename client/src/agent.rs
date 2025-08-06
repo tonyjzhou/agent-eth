@@ -75,6 +75,14 @@ impl EthereumAgent {
         }
     }
 
+    pub async fn clear_documents(&mut self) -> Result<()> {
+        if let Some(rag) = &mut self.rag {
+            rag.clear_documents().await
+        } else {
+            Err(anyhow::anyhow!("RAG system not initialized"))
+        }
+    }
+
     pub async fn is_documentation_query(&self, input: &str) -> bool {
         let doc_keywords = [
             "how",

@@ -64,4 +64,8 @@ impl RagSystem {
         let ingestion = ingestion::DocumentIngestion::new();
         ingestion.ingest_directory(dir_path, self).await
     }
+
+    pub async fn clear_documents(&mut self) -> Result<()> {
+        self.storage.clear_all_documents().await
+    }
 }

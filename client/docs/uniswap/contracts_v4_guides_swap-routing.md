@@ -1,0 +1,251 @@
+# https://docs.uniswap.org/contracts/v4/guides/swap-routing
+
+[Skip to main content](https://docs.uniswap.org/contracts/v4/guides/swap-routing#__docusaurus_skipToContent_fallback)
+[Uniswap Docs](https://docs.uniswap.org/)
+Search`⌘``K`
+[Submit Feedback](https://docs.google.com/forms/d/e/1FAIpQLSdjSkZam8KiatL9XACRVxCHjDJjaPGbls77PCXDKFn4JwykXg/viewform)
+  * [Concepts](https://docs.uniswap.org/concepts/overview)
+  * [Contracts](https://docs.uniswap.org/contracts/v4/overview)
+    * [v4 Protocol](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+      * [Overview](https://docs.uniswap.org/contracts/v4/overview)
+      * [Deployments](https://docs.uniswap.org/contracts/v4/deployments)
+      * [Concepts](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+      * [Quickstart](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+        * [Create Pool](https://docs.uniswap.org/contracts/v4/quickstart/create-pool)
+        * [Manage Liquidity](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+        * [Swap](https://docs.uniswap.org/contracts/v4/quickstart/swap)
+        * [Hooks](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+        * [Subscriber](https://docs.uniswap.org/contracts/v4/quickstart/subscriber)
+      * [Guides](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+        * [Hooks](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+        * [Unlock Callback & Deltas](https://docs.uniswap.org/contracts/v4/guides/unlock-callback)
+        * [Reading Pool State](https://docs.uniswap.org/contracts/v4/guides/read-pool-state)
+        * [Custom Accounting](https://docs.uniswap.org/contracts/v4/guides/custom-accounting)
+        * [Swap routing](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+        * [ERC-6909](https://docs.uniswap.org/contracts/v4/guides/ERC-6909)
+        * [Position Manager](https://docs.uniswap.org/contracts/v4/guides/position-manager)
+        * [StateView](https://docs.uniswap.org/contracts/v4/guides/state-view)
+        * [Flash Accounting](https://docs.uniswap.org/contracts/v4/guides/flash-accounting)
+        * [Access msg.sender Inside a Hook](https://docs.uniswap.org/contracts/v4/guides/accessing-msg.sender-using-hook)
+      * [Technical Reference](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+    * [v3 Protocol](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+    * [Smart Wallet](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+    * [UniswapX](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+    * [Universal Router](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+    * [Permit2](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+    * [v2 Protocol](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+    * [v1 Protocol](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+  * [SDKs](https://docs.uniswap.org/sdk/v4/overview)
+  * [APIs](https://docs.uniswap.org/api/subgraph/overview)
+
+
+  * [Home](https://docs.uniswap.org/)
+  * [Contracts](https://docs.uniswap.org/contracts/v4/overview)
+  * v4 Protocol
+  * Guides
+  * [Swap routing](https://docs.uniswap.org/contracts/v4/guides/swap-routing)
+
+
+On this page
+# Introduction to Universal Router for Uniswap v4 Swaps
+Uniswap v4 introduces a new architecture where all pools are managed by a single PoolManager contract. While the underlying architecture uses a callback system for swaps, developers can still use the Universal Router to execute swaps on v4 pools, just as you would for v2 or v3.
+## What is the Universal Router?[​](https://docs.uniswap.org/contracts/v4/guides/swap-routing#what-is-the-universal-router "Direct link to What is the Universal Router?")
+The Universal Router is a flexible, gas-efficient contract designed to execute complex swap operations across various protocols, including Uniswap v4. It serves as an intermediary between users and the Uniswap v4 `PoolManager`, handling the intricacies of swap execution.
+While it’s technically possible to interact directly with the PoolManager contract for swaps, this approach is generally not recommended due to its complexity and potential inefficiencies. The Universal Router is designed to abstract away these complexities, providing a more straightforward and efficient method for executing swaps on v4 pools.
+## UniversalRouter command encoding[​](https://docs.uniswap.org/contracts/v4/guides/swap-routing#universalrouter-command-encoding "Direct link to UniversalRouter command encoding")
+The [Universal Router](https://docs.uniswap.org/contracts/universal-router/overview) uses a unique encoding system for its commands and inputs, which is crucial to understand when configuring it for v4 swaps.
+When calling `UniversalRouter.execute()`, you provide two main parameters:
+  1. `bytes commands`: A string of bytes where each byte represents a single command to be executed.
+  2. `bytes[] inputs`: An array of byte strings, each containing the encoded parameters for its corresponding command.
+
+
+The `commands[i]` byte corresponds to the `inputs[i]` parameters, allowing for a series of operations to be defined and executed in sequence.
+Each command is encoded as a single byte (`bytes1`) with a specific structure:
+```
+0 1 2 3 4 5 6 7┌─┬─┬───────────┐│f│r| command │└─┴─┴───────────┘
+```
+
+  * The first bit (`f`) is a flag that determines whether the command is allowed to revert without causing the entire transaction to fail. This enables partial execution of complex transactions.
+  * The second bit (`r`) is reserved for future use, providing flexibility for potential upgrades.
+  * The remaining 6 bits represent the specific command to be executed.
+
+
+# Configuring Universal Router for Uniswap v4 Swaps
+## Use Cases[​](https://docs.uniswap.org/contracts/v4/guides/swap-routing#use-cases "Direct link to Use Cases")
+Developers might need to configure the Universal Router for swapping on Uniswap v4 pools in several scenarios:
+  1. **Building a DEX aggregator** : If you’re creating a platform that finds the best rates across multiple DEXes, you’ll want to include Uniswap v4 pools in your options.
+  2. **Developing a trading bot** : Automated trading strategies often require the ability to execute swaps programmatically across various pools and versions.
+  3. **Creating a Dapp** : Many DeFi applications (lending platforms, yield aggregators, etc.) need to perform token swaps as part of their core functionality.
+
+
+This guide focuses on how to interact with Universal Router from an on-chain contract.
+## Step 1: Set Up the Project[​](https://docs.uniswap.org/contracts/v4/guides/swap-routing#step-1-set-up-the-project "Direct link to Step 1: Set Up the Project")
+First, we need to set up our project and install the necessary dependencies.
+```
+forge install uniswap/v4-coreforge install uniswap/v4-peripheryforge install uniswap/permit2forge install uniswap/universal-routerforge install OpenZeppelin/openzeppelin-contracts
+```
+
+In the `remappings.txt`, add the following:
+```
+@uniswap/v4-core/=lib/v4-core/@uniswap/v4-periphery/=lib/v4-periphery/@uniswap/permit2/=lib/permit2/@uniswap/universal-router/=lib/universal-router/@openzeppelin/contracts/=lib/openzeppelin-contracts/[...]
+```
+
+We’ll create a new Solidity contract for our example.
+```
+// SPDX-License-Identifier: MITpragmasolidity0.8.26;import{ UniversalRouter }from"@uniswap/universal-router/contracts/UniversalRouter.sol";import{ Commands }from"@uniswap/universal-router/contracts/libraries/Commands.sol";import{ IPoolManager }from"@uniswap/v4-core/src/interfaces/IPoolManager.sol";import{ IV4Router }from"@uniswap/v4-periphery/src/interfaces/IV4Router.sol";import{ Actions }from"@uniswap/v4-periphery/src/libraries/Actions.sol";import{ IPermit2 }from"@uniswap/permit2/src/interfaces/IPermit2.sol";import{ IERC20 }from"@openzeppelin/contracts/token/ERC20/IERC20.sol";contractExample{usingStateLibraryfor IPoolManager;  UniversalRouter public immutable router;  IPoolManager public immutable poolManager;  IPermit2 public immutable permit2;constructor(address _router,address _poolManager,address _permit2){    router =UniversalRouter(_router);    poolManager =IPoolManager(_poolManager);    permit2 =IPermit2(_permit2);}// We'll add more functions here}
+```
+
+In this step, we’re importing the necessary contracts and interfaces:
+  * `UniversalRouter`: This will be our main interface for executing swaps. It provides a flexible way to interact with various Uniswap versions and other protocols.
+  * `Commands`: This library contains the command definitions used by the UniversalRouter.
+  * `IPoolManager`: This interface is needed for interacting with Uniswap v4 pools. While we don't directly use it in our simple example, it's often necessary for more complex interactions with v4 pools.
+  * `IPermit2`: This interface allows us to interact with the Permit2 contract, which provides enhanced token approval functionality.
+  * `StateLibrary`: This provides optimized functions for interacting with the PoolManager’s state. By using `StateLibrary`, we can more efficiently read and manipulate pool states, which is crucial for many operations in Uniswap v4.
+
+
+## Step 2: Implement Token Approval with Permit2[​](https://docs.uniswap.org/contracts/v4/guides/swap-routing#step-2-implement-token-approval-with-permit2 "Direct link to Step 2: Implement Token Approval with Permit2")
+`UniversalRouter` integrates with [Permit2](https://github.com/Uniswap/permit2), to enable users to have more safety, flexibility, and control over their ERC20 token approvals.
+Before we can execute swaps, we need to ensure our contract can transfer tokens. We’ll implement a function to approve the Universal Router to spend tokens on behalf of our contract.
+Here, for testing purposes, we set up our contract to use Permit2 with the UniversalRouter:
+```
+functionapproveTokenWithPermit2(address token,uint160 amount,uint48 expiration)external{IERC20(token).approve(address(permit2),type(uint256).max);  permit2.approve(token,address(router), amount, expiration);}
+```
+
+This function first approves Permit2 to spend the token, then uses Permit2 to approve the UniversalRouter with a specific amount and expiration time.
+## Step 3: Implementing a Swap Function[​](https://docs.uniswap.org/contracts/v4/guides/swap-routing#step-3-implementing-a-swap-function "Direct link to Step 3: Implementing a Swap Function")
+### 3.1: Function Signature[​](https://docs.uniswap.org/contracts/v4/guides/swap-routing#31-function-signature "Direct link to 3.1: Function Signature")
+First, let’s define our function signature:
+```
+functionswapExactInputSingle(  PoolKey calldata key,// PoolKey struct that identifies the v4 pooluint128 amountIn,// Exact amount of tokens to swapuint128 minAmountOut,// Minimum amount of output tokens expecteduint256 deadline // Timestamp after which the transaction will revert)externalreturns(uint256 amountOut){// Implementation will follow}
+```
+
+**Important note:**
+  1. The deadline parameter allows users to specify when their transaction should expire. This protects against unfavorable execution due to network delays or MEV attacks.
+  2. When swapping tokens involving native ETH, we use `Currency.wrap(address(0))` to represent ETH in the `PoolKey` struct.
+
+
+```
+structPoolKey{/// @notice The lower currency of the pool, sorted numerically.///     For native ETH, Currency currency0 = Currency.wrap(address(0));  Currency currency0;/// @notice The higher currency of the pool, sorted numerically  Currency currency1;/// @notice The pool LP fee, capped at 1_000_000. If the highest bit is 1, the pool has a dynamic fee and must be exactly equal to 0x800000uint24 fee;/// @notice Ticks that involve positions must be a multiple of tick spacingint24 tickSpacing;/// @notice The hooks of the pool  IHooks hooks;}
+```
+
+### 3.2: Encoding the Swap Command[​](https://docs.uniswap.org/contracts/v4/guides/swap-routing#32-encoding-the-swap-command "Direct link to 3.2: Encoding the Swap Command")
+When encoding a swap command for the Universal Router, we need to choose between two types of swaps:
+  1. Exact Input Swaps:
+
+
+Use this swap-type when you know the exact amount of tokens you want to swap in, and you're willing to accept any amount of output tokens above your minimum. This is common when you want to sell a specific amount of tokens.
+  1. Exact Output Swaps:
+
+
+Use this swap-type when you need a specific amount of output tokens, and you're willing to spend up to a maximum amount of input tokens. This is useful when you need to acquire a precise amount of tokens, for example, to repay a loan or meet a specific requirement.
+Next, we encode the swap command:
+```
+bytesmemory commands = abi.encodePacked(uint8(Commands.V4_SWAP));
+```
+
+Here, we're using `V4_SWAP`, which tells the Universal Router that we want to perform a swap on a Uniswap v4 pool. The specific type of swap (exact input or exact output) will be determined by the V4Router actions we encode later. As we saw earlier, we encode this as a single byte, which is how the Universal Router expects to receive commands.
+Check the complete list of [commands](https://docs.uniswap.org/contracts/universal-router/technical-reference#command).
+### 3.3: Action Encoding[​](https://docs.uniswap.org/contracts/v4/guides/swap-routing#33-action-encoding "Direct link to 3.3: Action Encoding")
+Now, let’s encode the actions for the swap:
+```
+// Encode V4Router actionsbytesmemory actions = abi.encodePacked(uint8(Actions.SWAP_EXACT_IN_SINGLE),uint8(Actions.SETTLE_ALL),uint8(Actions.TAKE_ALL));
+```
+
+These actions define the sequence of operations that will be performed in our v4 swap:
+  1. `SWAP_EXACT_IN_SINGLE`: This action specifies that we want to perform an exact input swap using a single pool.
+  2. `SETTLE_ALL`: This action ensures all input tokens involved in the swap are properly paid. This is part of v4's settlement pattern for handling token transfers.
+  3. `TAKE_ALL`: This final action collects all output tokens after the swap is complete.
+
+
+The sequence of these actions is important as they define the complete flow of our swap operation from start to finish.
+### 3.4: Preparing the Swap Inputs[​](https://docs.uniswap.org/contracts/v4/guides/swap-routing#34-preparing-the-swap-inputs "Direct link to 3.4: Preparing the Swap Inputs")
+For our v4 swap, we need to prepare three parameters that correspond to our encoded actions:
+```
+bytes[]memory params =newbytes[](3);// First parameter: swap configurationparams[0]= abi.encode(  IV4Router.ExactInputSingleParams({    poolKey: key,    zeroForOne:true,// true if we're swapping token0 for token1    amountIn: amountIn,// amount of tokens we're swapping    amountOutMinimum: minAmountOut,// minimum amount we expect to receive    hookData:bytes("")// no hook data needed}));// Second parameter: specify input tokens for the swap// encode SETTLE_ALL parametersparams[1]= abi.encode(key.currency0, amountIn);// Third parameter: specify output tokens from the swapparams[2]= abi.encode(key.currency1, minAmountOut);
+```
+
+Each encoded parameter serves a specific purpose:
+  1. The first parameter configures how the swap should be executed, defining the pool, amounts, and other swap-specific details
+  2. The second parameter defines what tokens we're putting into the swap
+  3. The third parameter defines what tokens we expect to receive from the swap
+
+
+These parameters work in conjunction with the actions we encoded earlier (`SWAP_EXACT_IN_SINGLE`, `SETTLE_ALL`, and `TAKE_ALL`) to execute our swap operation.
+### 3.5: Executing the Swap[​](https://docs.uniswap.org/contracts/v4/guides/swap-routing#35-executing-the-swap "Direct link to 3.5: Executing the Swap")
+Now we can execute the swap using the Universal Router. It's crucial to allow users to specify their own deadline for transaction execution:
+```
+// Combine actions and params into inputsinputs[0]= abi.encode(actions, params);// Execute the swap with deadline protectionrouter.execute(commands, inputs, deadline);
+```
+
+This prepares and executes the swap based on our encoded commands, actions, and parameters.
+> **Note** : Never use block.timestamp or type(uint256).max as the deadline parameter.
+### 3.6: (Optional) Verifying the Swap Output[​](https://docs.uniswap.org/contracts/v4/guides/swap-routing#36-optional-verifying-the-swap-output "Direct link to 3.6: \(Optional\) Verifying the Swap Output")
+After the swap, we need to verify that we received at least the minimum amount of tokens we specified:
+```
+amountOut =IERC20(key.currency1).balanceOf(address(this));require(amountOut >= minAmountOut,"Insufficient output amount");
+```
+
+### 3.7: Returning the Result[​](https://docs.uniswap.org/contracts/v4/guides/swap-routing#37-returning-the-result "Direct link to 3.7: Returning the Result")
+Finally, we return the amount of tokens we received:
+```
+return amountOut;
+```
+
+This allows the caller of the function to know exactly how many tokens were received in the swap.
+Here's the complete swap function that combines all the steps we've covered:
+```
+functionswapExactInputSingle(  PoolKey calldata key,uint128 amountIn,uint128 minAmountOut,uint256 deadline )externalreturns(uint256 amountOut){// Encode the Universal Router commandbytesmemory commands = abi.encodePacked(uint8(Commands.V4_SWAP));bytes[]memory inputs =newbytes[](1);// Encode V4Router actionsbytesmemory actions = abi.encodePacked(uint8(Actions.SWAP_EXACT_IN_SINGLE),uint8(Actions.SETTLE_ALL),uint8(Actions.TAKE_ALL));// Prepare parameters for each actionbytes[]memory params =newbytes[](3);  params[0]= abi.encode(    IV4Router.ExactInputSingleParams({      poolKey: key,      zeroForOne:true,      amountIn: amountIn,      amountOutMinimum: minAmountOut,      hookData:bytes("")}));  params[1]= abi.encode(key.currency0, amountIn);  params[2]= abi.encode(key.currency1, minAmountOut);// Combine actions and params into inputs  inputs[0]= abi.encode(actions, params);// Execute the swap  router.execute(commands, inputs, deadline);// Verify and return the output amount  amountOut =IERC20(key.currency1).balanceOf(address(this));require(amountOut >= minAmountOut,"Insufficient output amount");return amountOut;}
+```
+
+[Edit this page](https://github.com/uniswap/uniswap-docs/tree/main/docs/contracts/v4/guides/09-swap-routing.mdx)
+Was this helpful?
+[PreviousCustom Accounting](https://docs.uniswap.org/contracts/v4/guides/custom-accounting)[NextERC-6909](https://docs.uniswap.org/contracts/v4/guides/ERC-6909)
+On this page
+  * [What is the Universal Router?](https://docs.uniswap.org/contracts/v4/guides/swap-routing#what-is-the-universal-router)
+  * [UniversalRouter command encoding](https://docs.uniswap.org/contracts/v4/guides/swap-routing#universalrouter-command-encoding)
+  * [Use Cases](https://docs.uniswap.org/contracts/v4/guides/swap-routing#use-cases)
+  * [Step 1: Set Up the Project](https://docs.uniswap.org/contracts/v4/guides/swap-routing#step-1-set-up-the-project)
+  * [Step 2: Implement Token Approval with Permit2](https://docs.uniswap.org/contracts/v4/guides/swap-routing#step-2-implement-token-approval-with-permit2)
+  * [Step 3: Implementing a Swap Function](https://docs.uniswap.org/contracts/v4/guides/swap-routing#step-3-implementing-a-swap-function)
+    * [3.1: Function Signature](https://docs.uniswap.org/contracts/v4/guides/swap-routing#31-function-signature)
+    * [3.2: Encoding the Swap Command](https://docs.uniswap.org/contracts/v4/guides/swap-routing#32-encoding-the-swap-command)
+    * [3.3: Action Encoding](https://docs.uniswap.org/contracts/v4/guides/swap-routing#33-action-encoding)
+    * [3.4: Preparing the Swap Inputs](https://docs.uniswap.org/contracts/v4/guides/swap-routing#34-preparing-the-swap-inputs)
+    * [3.5: Executing the Swap](https://docs.uniswap.org/contracts/v4/guides/swap-routing#35-executing-the-swap)
+    * [3.6: (Optional) Verifying the Swap Output](https://docs.uniswap.org/contracts/v4/guides/swap-routing#36-optional-verifying-the-swap-output)
+    * [3.7: Returning the Result](https://docs.uniswap.org/contracts/v4/guides/swap-routing#37-returning-the-result)
+
+
+[Edit this page](https://github.com/uniswap/uniswap-docs/tree/main/docs/contracts/v4/guides/09-swap-routing.mdx)
+## Footer
+[Uniswap Labs](https://docs.uniswap.org/)
+### Developers
+  * [Dev Chat](https://discord.com/invite/uniswap)
+  * [Concepts](https://docs.uniswap.org/concepts/overview)
+  * [Contracts](https://docs.uniswap.org/contracts/v4/overview)
+  * [SDKs](https://docs.uniswap.org/sdk/v4/overview)
+  * [APIs](https://docs.uniswap.org/api/subgraph/overview)
+  * [Whitepaper](https://app.uniswap.org/whitepaper-v4.pdf)
+
+
+### Ecosystem
+  * [Uniswap App](https://app.uniswap.org/)
+  * [Governance](https://www.uniswapfoundation.org/governance)
+  * [Blog](https://blog.uniswap.org/)
+
+
+### Company
+  * [Careers](https://boards.greenhouse.io/uniswaplabs)
+  * [Brand Assets](https://github.com/Uniswap/brand-assets/raw/main/Uniswap%20Brand%20Assets.zip)
+  * [Terms of Service](https://support.uniswap.org/hc/en-us/articles/30935100859661-Uniswap-Labs-Terms-of-Service)
+  * [Privacy Policy](https://support.uniswap.org/hc/en-us/articles/30934457771405-Uniswap-Labs-Privacy-Policy)
+  * [Trademark Policy](https://support.uniswap.org/hc/en-us/articles/30934762216973-Uniswap-Labs-Trademark-Guidelines)
+
+
+### Need Help?
+  * [Help Center](https://support.uniswap.org/)
+  * [Contact Us](https://support.uniswap.org/hc/en-us/requests/new)
+
+
+@2025 Uniswap Labs
+[](https://github.com/uniswap/uniswap-docs)[](https://twitter.com/Uniswap)[](https://discord.com/invite/uniswap)

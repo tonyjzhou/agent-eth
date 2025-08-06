@@ -128,6 +128,12 @@ impl VectorStorage {
         Ok(search_results)
     }
 
+    pub async fn clear_all_documents(&mut self) -> Result<()> {
+        self.conn.execute("DELETE FROM embeddings", [])?;
+        self.conn.execute("DELETE FROM documents", [])?;
+        Ok(())
+    }
+
     fn cosine_similarity(&self, a: &[f32], b: &[f32]) -> f32 {
         let dot_product: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
         let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();

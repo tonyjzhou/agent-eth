@@ -1,0 +1,131 @@
+# https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions
+
+[Skip to main content](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#__docusaurus_skipToContent_fallback)
+[Uniswap Docs](https://docs.uniswap.org/)
+Search`⌘``K`
+[Submit Feedback](https://docs.google.com/forms/d/e/1FAIpQLSdjSkZam8KiatL9XACRVxCHjDJjaPGbls77PCXDKFn4JwykXg/viewform)
+  * [Concepts](https://docs.uniswap.org/concepts/overview)
+  * [Contracts](https://docs.uniswap.org/contracts/v4/overview)
+  * [SDKs](https://docs.uniswap.org/sdk/v4/overview)
+    * [v4 SDK](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+      * [Overview](https://docs.uniswap.org/sdk/v4/overview)
+      * [Guides](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+        * [Swaps](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+        * [Position Management](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+        * [Advanced](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+      * [Technical Reference](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+        * [Overview](https://docs.uniswap.org/sdk/v4/reference/overview)
+        * [classes](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+        * [enumerations](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+        * [interfaces](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+          * [AllowanceTransferPermitBatch](https://docs.uniswap.org/sdk/v4/reference/interfaces/AllowanceTransferPermitBatch)
+          * [AllowanceTransferPermitSingle](https://docs.uniswap.org/sdk/v4/reference/interfaces/AllowanceTransferPermitSingle)
+          * [BatchPermitOptions](https://docs.uniswap.org/sdk/v4/reference/interfaces/BatchPermitOptions)
+          * [BestTradeOptions](https://docs.uniswap.org/sdk/v4/reference/interfaces/BestTradeOptions)
+          * [CollectSpecificOptions](https://docs.uniswap.org/sdk/v4/reference/interfaces/CollectSpecificOptions)
+          * [CommonAddLiquidityOptions](https://docs.uniswap.org/sdk/v4/reference/interfaces/CommonAddLiquidityOptions)
+          * [CommonOptions](https://docs.uniswap.org/sdk/v4/reference/interfaces/CommonOptions)
+          * [MethodParameters](https://docs.uniswap.org/sdk/v4/reference/interfaces/MethodParameters)
+          * [MintSpecificOptions](https://docs.uniswap.org/sdk/v4/reference/interfaces/MintSpecificOptions)
+          * [ModifyPositionSpecificOptions](https://docs.uniswap.org/sdk/v4/reference/interfaces/ModifyPositionSpecificOptions)
+          * [NFTPermitData](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitData)
+          * [NFTPermitOptions](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+          * [NFTPermitValues](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitValues)
+          * [PermitDetails](https://docs.uniswap.org/sdk/v4/reference/interfaces/PermitDetails)
+          * [RemoveLiquiditySpecificOptions](https://docs.uniswap.org/sdk/v4/reference/interfaces/RemoveLiquiditySpecificOptions)
+          * [TransferOptions](https://docs.uniswap.org/sdk/v4/reference/interfaces/TransferOptions)
+    * [v3 SDK](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+    * [Swap Widget](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+    * [web3-react](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+    * [Core SDK](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+    * [v2 SDK](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+    * [v1 SDK](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+  * [APIs](https://docs.uniswap.org/api/subgraph/overview)
+
+
+  * [Home](https://docs.uniswap.org/)
+  * [SDKs](https://docs.uniswap.org/sdk/v4/overview)
+  * v4 SDK
+  * Technical Reference
+  * interfaces
+  * [NFTPermitOptions](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions)
+
+
+On this page
+# NFTPermitOptions
+[@uniswap/v4-sdk](https://docs.uniswap.org/sdk/v4/reference/overview) / NFTPermitOptions
+Defined in: [PositionManager.ts:174](https://github.com/Uniswap/sdks/blob/9cf6edb2df79338ae58f7ea7ca979c35a8a9bd56/sdks/v4-sdk/src/PositionManager.ts#L174)
+## Extends[​](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#extends "Direct link to Extends")
+  * [`NFTPermitValues`](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitValues)
+
+
+## Properties[​](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#properties "Direct link to Properties")
+### deadline[​](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#deadline "Direct link to deadline")
+> **deadline** : `BigintIsh`
+Defined in: [PositionManager.ts:170](https://github.com/Uniswap/sdks/blob/9cf6edb2df79338ae58f7ea7ca979c35a8a9bd56/sdks/v4-sdk/src/PositionManager.ts#L170)
+#### Inherited from[​](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#inherited-from "Direct link to Inherited from")
+[`NFTPermitValues`](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitValues).[`deadline`](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitValues#deadline)
+### nonce[​](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#nonce "Direct link to nonce")
+> **nonce** : `BigintIsh`
+Defined in: [PositionManager.ts:171](https://github.com/Uniswap/sdks/blob/9cf6edb2df79338ae58f7ea7ca979c35a8a9bd56/sdks/v4-sdk/src/PositionManager.ts#L171)
+#### Inherited from[​](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#inherited-from-1 "Direct link to Inherited from")
+[`NFTPermitValues`](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitValues).[`nonce`](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitValues#nonce)
+### signature[​](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#signature "Direct link to signature")
+> **signature** : `string`
+Defined in: [PositionManager.ts:175](https://github.com/Uniswap/sdks/blob/9cf6edb2df79338ae58f7ea7ca979c35a8a9bd56/sdks/v4-sdk/src/PositionManager.ts#L175)
+### spender[​](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#spender "Direct link to spender")
+> **spender** : `string`
+Defined in: [PositionManager.ts:168](https://github.com/Uniswap/sdks/blob/9cf6edb2df79338ae58f7ea7ca979c35a8a9bd56/sdks/v4-sdk/src/PositionManager.ts#L168)
+#### Inherited from[​](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#inherited-from-2 "Direct link to Inherited from")
+[`NFTPermitValues`](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitValues).[`spender`](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitValues#spender)
+### tokenId[​](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#tokenid "Direct link to tokenId")
+> **tokenId** : `BigintIsh`
+Defined in: [PositionManager.ts:169](https://github.com/Uniswap/sdks/blob/9cf6edb2df79338ae58f7ea7ca979c35a8a9bd56/sdks/v4-sdk/src/PositionManager.ts#L169)
+#### Inherited from[​](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#inherited-from-3 "Direct link to Inherited from")
+[`NFTPermitValues`](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitValues).[`tokenId`](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitValues#tokenid)
+[Edit this page](https://github.com/uniswap/uniswap-docs/tree/main/docs/sdk/v4/reference/interfaces/NFTPermitOptions.md)
+Was this helpful?
+[PreviousNFTPermitData](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitData)[NextNFTPermitValues](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitValues)
+On this page
+  * [Extends](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#extends)
+  * [Properties](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#properties)
+    * [deadline](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#deadline)
+    * [nonce](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#nonce)
+    * [signature](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#signature)
+    * [spender](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#spender)
+    * [tokenId](https://docs.uniswap.org/sdk/v4/reference/interfaces/NFTPermitOptions#tokenid)
+
+
+[Edit this page](https://github.com/uniswap/uniswap-docs/tree/main/docs/sdk/v4/reference/interfaces/NFTPermitOptions.md)
+## Footer
+[Uniswap Labs](https://docs.uniswap.org/)
+### Developers
+  * [Dev Chat](https://discord.com/invite/uniswap)
+  * [Concepts](https://docs.uniswap.org/concepts/overview)
+  * [Contracts](https://docs.uniswap.org/contracts/v4/overview)
+  * [SDKs](https://docs.uniswap.org/sdk/v4/overview)
+  * [APIs](https://docs.uniswap.org/api/subgraph/overview)
+  * [Whitepaper](https://app.uniswap.org/whitepaper-v4.pdf)
+
+
+### Ecosystem
+  * [Uniswap App](https://app.uniswap.org/)
+  * [Governance](https://www.uniswapfoundation.org/governance)
+  * [Blog](https://blog.uniswap.org/)
+
+
+### Company
+  * [Careers](https://boards.greenhouse.io/uniswaplabs)
+  * [Brand Assets](https://github.com/Uniswap/brand-assets/raw/main/Uniswap%20Brand%20Assets.zip)
+  * [Terms of Service](https://support.uniswap.org/hc/en-us/articles/30935100859661-Uniswap-Labs-Terms-of-Service)
+  * [Privacy Policy](https://support.uniswap.org/hc/en-us/articles/30934457771405-Uniswap-Labs-Privacy-Policy)
+  * [Trademark Policy](https://support.uniswap.org/hc/en-us/articles/30934762216973-Uniswap-Labs-Trademark-Guidelines)
+
+
+### Need Help?
+  * [Help Center](https://support.uniswap.org/)
+  * [Contact Us](https://support.uniswap.org/hc/en-us/requests/new)
+
+
+@2025 Uniswap Labs
+[](https://github.com/uniswap/uniswap-docs)[](https://twitter.com/Uniswap)[](https://discord.com/invite/uniswap)

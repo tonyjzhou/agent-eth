@@ -83,6 +83,25 @@ async fn main() -> Result<()> {
                         print_help();
                         continue;
                     }
+                    "clear" | "clear docs" => {
+                        println!(
+                            "{}",
+                            "🗑️  Clearing all ingested documents...".bright_yellow()
+                        );
+
+                        match agent.clear_documents().await {
+                            Ok(()) => {
+                                println!(
+                                    "{} All documents cleared from RAG system",
+                                    "✅".bright_green()
+                                )
+                            }
+                            Err(e) => {
+                                println!("{} Failed to clear documents: {}", "❌".bright_red(), e)
+                            }
+                        }
+                        continue;
+                    }
                     line if line.starts_with("test swap") => {
                         // Manual test without Claude API
                         println!("🔄 Testing swap functionality manually...");
@@ -404,6 +423,12 @@ fn print_help() {
         "ingest <directory_path>".bright_cyan()
     );
     println!("    Example: {}", "ingest client/docs".italic());
+    println!();
+    println!(
+        "  {} - Clear all ingested documents",
+        "clear or clear docs".bright_cyan()
+    );
+    println!("    Example: {}", "clear docs".italic());
     println!();
     println!("  {} - Show this help", "help".bright_cyan());
     println!("  {} - Exit the program", "exit".bright_cyan());
