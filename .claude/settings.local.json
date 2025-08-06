@@ -24,7 +24,10 @@
       "WebFetch(domain:0x.org)",
       "WebFetch(domain:brave.com)",
       "WebFetch(domain:docs.llama.fi)",
-      "WebFetch(domain:docs.uniswap.org)"
+      "WebFetch(domain:docs.uniswap.org)",
+      "WebFetch(domain:dev.to)",
+      "Bash(ANTHROPIC_API_KEY=\"dummy_key_for_testing\" cargo run --bin client)",
+      "Bash(ANTHROPIC_API_KEY=\"dummy_key_for_testing\" timeout 10 cargo run)"
     ],
     "deny": []
   }

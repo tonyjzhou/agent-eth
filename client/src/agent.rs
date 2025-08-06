@@ -1,3 +1,4 @@
+use crate::rag::RagSystem;
 use anyhow::Result;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -9,6 +10,7 @@ pub struct EthereumAgent {
     client: Client,
     api_key: String,
     account_aliases: HashMap<String, String>,
+    rag: Option<RagSystem>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -47,51 +49,118 @@ impl EthereumAgent {
             client,
             api_key: anthropic_api_key.to_string(),
             account_aliases,
+            rag: None,
         })
     }
 
+    pub async fn initialize_rag(&mut self, db_path: &str) -> Result<()> {
+        let rag_system = RagSystem::new(db_path).await?;
+        self.rag = Some(rag_system);
+        Ok(())
+    }
+
+    pub async fn search_docs(&self, query: &str) -> Result<Vec<crate::rag::SearchResult>> {
+        if let Some(rag) = &self.rag {
+            rag.search(query, 5).await
+        } else {
+            Ok(vec![])
+        }
+    }
+
+    pub async fn ingest_documents(&mut self, dir_path: &str) -> Result<usize> {
+        if let Some(rag) = &mut self.rag {
+            rag.ingest_directory(dir_path).await
+        } else {
+            Err(anyhow::anyhow!("RAG system not initialized"))
+        }
+    }
+
+    pub async fn is_documentation_query(&self, input: &str) -> bool {
+        let doc_keywords = [
+            "how",
+            "what",
+            "explain",
+            "difference",
+            "documentation",
+            "docs",
+            "contract",
+            "interface",
+            "function",
+            "slippage",
+            "uniswap",
+            "router",
+            "exactinput",
+            "exactoutput",
+            "swap",
+            "pool",
+        ];
+
+        let input_lower = input.to_lowercase();
+        doc_keywords
+            .iter()
+            .any(|&keyword| input_lower.contains(keyword))
+    }
+
     pub async fn parse_command(&self, user_input: &str) -> Result<ParsedCommand> {
-        let system_prompt = r#"You are an Ethereum blockchain assistant that helps users interact with the blockchain using natural language.
+        // Check if this is a documentation query and get RAG context
+        let mut additional_context = String::new();
+        if self.is_documentation_query(user_input).await {
+            if let Ok(search_results) = self.search_docs(user_input).await {
+                if !search_results.is_empty() {
+                    additional_context = "\n\nRelevant Documentation Context:\n".to_string();
+                    for result in search_results.iter().take(3) {
+                        additional_context.push_str(&format!(
+                            "- {}: {}\n",
+                            result.document.title,
+                            result.relevant_chunk.chars().take(200).collect::<String>()
+                        ));
+                    }
+                }
+            }
+        }
+
+        let system_prompt = format!(
+            r#"You are an Ethereum blockchain assistant that helps users interact with the blockchain using natural language.{additional_context}
 
 Parse user requests into JSON with EXACTLY this structure. Use "action" (not "command") as the field name:
 
 For balance queries:
-{
+{{
   "action": "balance",
   "address": "0x...",
   "token": "ETH"
-}
+}}
 
 For token balance queries:
-{
+{{
   "action": "balance", 
   "address": "0x...",
   "token": "USDC"
-}
+}}
 
 For transfers:
-{
+{{
   "action": "transfer", 
   "from_address": "0x...",
   "to_address": "0x...",
   "amount": "1.0"
-}
+}}
 
 For contract checks:
-{
+{{
   "action": "contract_check",
   "address": "0x..."
-}
+}}
 
 For token swaps (including Uniswap commands):
-{
+{{
   "action": "swap",
   "from_address": "0x...",
   "token_in": "ETH",
   "token_out": "USDC", 
   "amount_in": "10.0",
   "slippage_bps": 200
-}
+}}
 
 Examples of swap commands to recognize:
 - "Use Uniswap V2 Router to swap 10 ETH for USDC on Alice's account"
@@ -103,7 +172,8 @@ Account aliases (resolve these to hex addresses):
 - Bob: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
 - Carol: 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
 
-IMPORTANT: Always use "action" as the field name, never "command". Response must be valid JSON only."#;
+IMPORTANT: Always use "action" as the field name, never "command". Response must be valid JSON only."#
+        );
 
         let messages = json!([
             {
@@ -195,6 +265,71 @@ IMPORTANT: Always use "action" as the field name, never "command". Response must
         }
 
         Ok(resolved)
+    }
+
+    pub async fn answer_documentation_query(&self, query: &str) -> Result<String> {
+        let search_results = self.search_docs(query).await?;
+
+        if search_results.is_empty() {
+            return Ok(
+                "I don't have specific documentation for that query in my knowledge base."
+                    .to_string(),
+            );
+        }
+
+        // Build context from search results
+        let mut context = String::new();
+        for result in search_results.iter().take(3) {
+            context.push_str(&format!(
+                "From {}:\n{}\n\n",
+                result.document.title, result.relevant_chunk
+            ));
+        }
+
+        let system_prompt = format!(
+            "You are an expert on Ethereum and Uniswap. Answer the user's question based on the provided documentation context. Be accurate and specific.\n\nContext:\n{context}"
+        );
+
+        let messages = json!([
+            {
+                "role": "user",
+                "content": query
+            }
+        ]);
+
+        let response = self
+            .client
+            .post("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&json!({
+                "model": "claude-3-5-sonnet-20241022",
+                "max_tokens": 1024,
+                "system": system_prompt,
+                "messages": messages
+            }))
+            .send()
+            .await?;
+
+        let response_text = response.text().await?;
+        let response_json: serde_json::Value = serde_json::from_str(&response_text)?;
+
+        if let Some(error) = response_json.get("error") {
+            return Err(anyhow::anyhow!(
+                "Claude API error: {}",
+                error
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("Unknown error")
+            ));
+        }
+
+        let content = response_json["content"][0]["text"]
+            .as_str()
+            .unwrap_or("Unable to generate response");
+
+        Ok(content.to_string())
     }
 
     pub fn get_private_key_for_address(&self, address: &str) -> Option<String> {

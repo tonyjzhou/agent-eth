@@ -1,5 +1,6 @@
 mod agent;
 mod mcp_client;
+mod rag;
 
 use agent::EthereumAgent;
 use anyhow::Result;
@@ -32,8 +33,24 @@ async fn main() -> Result<()> {
     );
 
     // Initialize components
-    let agent = EthereumAgent::new(&anthropic_api_key)?;
+    let mut agent = EthereumAgent::new(&anthropic_api_key)?;
     let mcp_client = McpClient::new(&args.server_url);
+
+    // Initialize RAG system
+    let rag_db_path = "client_rag.db";
+    if let Err(e) = agent.initialize_rag(rag_db_path).await {
+        println!(
+            "{} Failed to initialize RAG system: {}",
+            "⚠️".bright_yellow(),
+            e
+        );
+        println!(
+            "{}",
+            "Continuing without documentation search...".bright_yellow()
+        );
+    } else {
+        println!("{}", "✅ RAG system initialized".bright_green());
+    }
 
     println!("{}", "✅ Connected to MCP server".bright_green());
     println!(
@@ -89,7 +106,59 @@ async fn main() -> Result<()> {
                         }
                         continue;
                     }
+                    line if line.starts_with("docs ") || line.starts_with("explain ") => {
+                        // Handle documentation queries
+                        let query = if let Some(stripped) = line.strip_prefix("docs ") {
+                            stripped
+                        } else {
+                            &line[8..]
+                        };
+
+                        println!(
+                            "{} {}",
+                            "🔍 Searching docs for:".bright_blue(),
+                            query.italic()
+                        );
+
+                        if let Ok(answer) = agent.answer_documentation_query(query).await {
+                            println!("{} {}", "📖".bright_blue(), answer);
+                        } else {
+                            println!("{}", "❌ Failed to search documentation".bright_red());
+                        }
+                        continue;
+                    }
                     _ => {
+                        // Check for CLI commands first before documentation queries
+                        if let Some(dir_path) = input.strip_prefix("ingest ") {
+                            println!(
+                                "{} {}",
+                                "📚 Ingesting documents from:".bright_blue(),
+                                dir_path
+                            );
+
+                            match agent.ingest_documents(dir_path).await {
+                                Ok(count) => {
+                                    println!("{} Ingested {} documents", "✅".bright_green(), count)
+                                }
+                                Err(e) => println!("{} Failed to ingest: {}", "❌".bright_red(), e),
+                            }
+                            continue;
+                        }
+
+                        // Check if this might be a documentation query
+                        if agent.is_documentation_query(input).await {
+                            println!(
+                                "{} {}",
+                                "🔍 Searching docs for:".bright_blue(),
+                                input.italic()
+                            );
+
+                            if let Ok(answer) = agent.answer_documentation_query(input).await {
+                                println!("{} {}", "📖".bright_blue(), answer);
+                                continue;
+                            }
+                        }
+
                         if let Err(e) = handle_command(&agent, &mcp_client, input).await {
                             println!("{} {}", "❌ Error:".bright_red().bold(), e);
                         }
@@ -319,6 +388,22 @@ fn print_help() {
     println!("    • Alice: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
     println!("    • Bob:   0x70997970C51812dc3A010C7d01b50e0d17dc79C8");
     println!("    • Carol: 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC");
+    println!();
+    println!();
+    println!(
+        "  {} - Search documentation",
+        "docs <query> or explain <query>".bright_cyan()
+    );
+    println!(
+        "    Example: {}",
+        "docs How do I calculate slippage?".italic()
+    );
+    println!();
+    println!(
+        "  {} - Ingest documents into RAG system",
+        "ingest <directory_path>".bright_cyan()
+    );
+    println!("    Example: {}", "ingest client/docs".italic());
     println!();
     println!("  {} - Show this help", "help".bright_cyan());
     println!("  {} - Exit the program", "exit".bright_cyan());
