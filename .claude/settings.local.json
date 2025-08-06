@@ -11,7 +11,8 @@
       "WebFetch(domain:alloy.rs)",
       "WebFetch(domain:docs.alloy.rs)",
       "Bash(cargo add:*)",
-      "Bash(cargo:*)"
+      "Bash(cargo:*)",
+      "Bash(python3:*)"
     ],
     "deny": []
   }

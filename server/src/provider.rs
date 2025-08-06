@@ -91,6 +91,9 @@ impl EthereumProvider {
         let pending_tx = provider_with_wallet.send_transaction(tx_request).await?;
         let tx_hash = *pending_tx.tx_hash();
 
+        // Wait for transaction to be mined
+        let _receipt = pending_tx.get_receipt().await?;
+
         Ok(format!("{tx_hash:#x}"))
     }
 }
