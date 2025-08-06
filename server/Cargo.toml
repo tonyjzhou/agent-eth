@@ -11,8 +11,8 @@ anyhow = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-# Ethereum interaction
-ethers = { version = "2.0", features = ["ws", "rustls"] }
+# Ethereum interaction (migrated from deprecated ethers-rs to Alloy)
+alloy = { version = "1.0", features = ["full"] }
 
 # HTTP server for MCP
 axum = "0.7"
@@ -23,3 +23,4 @@ futures = "0.3"
 
 # Address and transaction types
 hex = "0.4"
+reqwest = { version = "0.12", default-features = false }

@@ -7,7 +7,11 @@
       "WebFetch(domain:docs.anthropic.com)",
       "Bash(mkdir:*)",
       "Bash(cargo check:*)",
-      "Bash(cargo build:*)"
+      "Bash(cargo build:*)",
+      "WebFetch(domain:alloy.rs)",
+      "WebFetch(domain:docs.alloy.rs)",
+      "Bash(cargo add:*)",
+      "Bash(cargo:*)"
     ],
     "deny": []
   }

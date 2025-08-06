@@ -1,6 +1,6 @@
 use crate::provider::EthereumProvider;
+use alloy::primitives::utils;
 use anyhow::Result;
-use ethers::utils;
 
 pub async fn get_balance(
     provider: &EthereumProvider,
