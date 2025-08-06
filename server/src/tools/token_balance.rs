@@ -1,3 +1,4 @@
+use crate::api::address_resolver::Network;
 use crate::api::ApiClient;
 use crate::contracts::ContractInteraction;
 use crate::provider::EthereumProvider;
@@ -25,7 +26,7 @@ pub async fn get_token_balance(
 
     // For ERC20 tokens, we need to get the token contract address
     let api_client = ApiClient::new()?;
-    let contracts = ContractInteraction::new()?;
+    let contracts = ContractInteraction::new_with_resolver(Network::Ethereum).await?;
 
     let token_addresses = api_client.search_contract_address(&token_symbol).await?;
 

@@ -1,3 +1,4 @@
+use crate::api::address_resolver::Network;
 use crate::api::ApiClient;
 use crate::contracts::ContractInteraction;
 use crate::provider::EthereumProvider;
@@ -23,7 +24,7 @@ pub async fn execute_swap(provider: &EthereumProvider, params: SwapParams) -> Re
     );
 
     let api_client = ApiClient::new()?;
-    let contracts = ContractInteraction::new()?;
+    let contracts = ContractInteraction::new_with_resolver(Network::Ethereum).await?;
 
     let _from_address = Address::from_str(&params.from_address)?;
 

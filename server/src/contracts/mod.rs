@@ -1,3 +1,4 @@
+use crate::api::address_resolver::{AddressResolver, Network};
 use alloy::primitives::{Address, U256};
 use alloy::sol;
 use alloy::sol_types::SolCall;
@@ -54,9 +55,22 @@ pub struct ContractInteraction {
 }
 
 impl ContractInteraction {
+    #[allow(dead_code)]
     pub fn new() -> Result<Self> {
+        // Use fallback hardcoded addresses for backward compatibility
         let router_address = Address::from_str("0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D")?;
         let weth_address = Address::from_str("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")?;
+
+        Ok(Self {
+            router_address,
+            weth_address,
+        })
+    }
+
+    pub async fn new_with_resolver(network: Network) -> Result<Self> {
+        let resolver = AddressResolver::new()?;
+        let router_address = resolver.get_uniswap_v2_router(network.clone()).await?;
+        let weth_address = resolver.get_weth_address(network).await?;
 
         Ok(Self {
             router_address,
