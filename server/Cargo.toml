@@ -23,7 +23,10 @@ futures = "0.3"
 
 # Address and transaction types
 hex = "0.4"
-reqwest = { version = "0.12", default-features = false }
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+
+# External API integration
+regex = "1.0"
 
 [dev-dependencies]
 tokio-test = "0.4"

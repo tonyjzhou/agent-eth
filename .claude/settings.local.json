@@ -18,7 +18,8 @@
       "Bash(lsof:*)",
       "Bash(timeout 10 cargo run)",
       "Bash(ls:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "WebFetch(domain:etherscan.io)"
     ],
     "deny": []
   }

@@ -18,11 +18,14 @@ impl McpClient {
         }
     }
 
-    pub async fn get_balance(&self, address: &str, in_ether: bool) -> Result<String> {
-        let params = json!({
-            "address": address,
-            "in_ether": in_ether
+    pub async fn get_balance(&self, address: &str, token: Option<&str>) -> Result<String> {
+        let mut params = json!({
+            "address": address
         });
+
+        if let Some(token_symbol) = token {
+            params["token"] = json!(token_symbol);
+        }
 
         let response = self
             .client
@@ -68,6 +71,35 @@ impl McpClient {
         let response = self
             .client
             .post(format!("{}/contract_check", self.server_url))
+            .json(&params)
+            .send()
+            .await?;
+
+        let result: Value = response.json().await?;
+        Ok(result["result"].as_str().unwrap_or("Unknown").to_string())
+    }
+
+    pub async fn execute_swap(
+        &self,
+        from_address: &str,
+        token_in: &str,
+        token_out: &str,
+        amount_in: &str,
+        slippage_bps: u16,
+        private_key: &str,
+    ) -> Result<String> {
+        let params = json!({
+            "from_address": from_address,
+            "token_in": token_in,
+            "token_out": token_out,
+            "amount_in": amount_in,
+            "slippage_bps": slippage_bps,
+            "private_key": private_key
+        });
+
+        let response = self
+            .client
+            .post(format!("{}/swap", self.server_url))
             .json(&params)
             .send()
             .await?;

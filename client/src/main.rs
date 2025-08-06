@@ -66,6 +66,29 @@ async fn main() -> Result<()> {
                         print_help();
                         continue;
                     }
+                    line if line.starts_with("test swap") => {
+                        // Manual test without Claude API
+                        println!("🔄 Testing swap functionality manually...");
+                        let test_command = agent::ParsedCommand {
+                            action: "swap".to_string(),
+                            from_address: Some(
+                                "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266".to_string(),
+                            ),
+                            to_address: None,
+                            amount: None,
+                            address: None,
+                            token_in: Some("ETH".to_string()),
+                            token_out: Some("USDC".to_string()),
+                            amount_in: Some("0.1".to_string()),
+                            slippage_bps: Some(200),
+                            token: None,
+                        };
+
+                        if let Err(e) = handle_test_swap(&mcp_client, test_command).await {
+                            println!("{} {}", "❌ Test Error:".bright_red().bold(), e);
+                        }
+                        continue;
+                    }
                     _ => {
                         if let Err(e) = handle_command(&agent, &mcp_client, input).await {
                             println!("{} {}", "❌ Error:".bright_red().bold(), e);
@@ -99,8 +122,16 @@ async fn handle_command(agent: &EthereumAgent, mcp_client: &McpClient, input: &s
     match parsed.action.as_str() {
         "balance" => {
             if let Some(address) = parsed.address {
-                println!("{} {}", "🔍 Checking balance for:".bright_yellow(), address);
-                let result = mcp_client.get_balance(&address, true).await?;
+                let token = parsed.token.as_deref();
+                let token_display = token.unwrap_or("ETH");
+                println!(
+                    "{} {} {}",
+                    "🔍 Checking".bright_yellow(),
+                    token_display,
+                    "balance for:".bright_yellow()
+                );
+                println!("  Address: {}", address.bright_cyan());
+                let result = mcp_client.get_balance(&address, token).await?;
                 println!("{} {}", "💰 Balance:".bright_green().bold(), result);
             } else {
                 println!(
@@ -154,12 +185,98 @@ async fn handle_command(agent: &EthereumAgent, mcp_client: &McpClient, input: &s
                 );
             }
         }
+        "swap" => {
+            if let (Some(from), Some(token_in), Some(token_out), Some(amount_in)) = (
+                parsed.from_address.as_ref(),
+                parsed.token_in.as_ref(),
+                parsed.token_out.as_ref(),
+                parsed.amount_in.as_ref(),
+            ) {
+                let from_addr = from.as_str();
+                let private_key =
+                    agent
+                        .get_private_key_for_address(from_addr)
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("No private key available for address: {}", from_addr)
+                        })?;
+
+                let slippage_bps = parsed.slippage_bps.unwrap_or(200);
+
+                println!(
+                    "{} {} {} for {} (slippage: {}%)",
+                    "🔄 Swapping".bright_blue(),
+                    amount_in.bright_white().bold(),
+                    token_in.to_uppercase().bright_cyan(),
+                    token_out.to_uppercase().bright_cyan(),
+                    slippage_bps as f64 / 100.0
+                );
+
+                let result = mcp_client
+                    .execute_swap(
+                        from_addr,
+                        token_in,
+                        token_out,
+                        amount_in,
+                        slippage_bps,
+                        &private_key,
+                    )
+                    .await?;
+                println!("{}", result.bright_green());
+            } else {
+                println!(
+                    "{}",
+                    "❌ Missing parameters for swap (need from_address, token_in, token_out, amount_in)".bright_red()
+                );
+            }
+        }
         _ => {
             println!("{} {}", "❓ Unknown action:".bright_red(), parsed.action);
         }
     }
 
     println!();
+    Ok(())
+}
+
+async fn handle_test_swap(mcp_client: &McpClient, parsed: agent::ParsedCommand) -> Result<()> {
+    println!("🔍 Debug: Test parsed action = '{}'", parsed.action);
+
+    if let (Some(from), Some(token_in), Some(token_out), Some(amount_in)) = (
+        parsed.from_address.as_ref(),
+        parsed.token_in.as_ref(),
+        parsed.token_out.as_ref(),
+        parsed.amount_in.as_ref(),
+    ) {
+        let private_key = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"; // Alice's test key
+        let slippage_bps = parsed.slippage_bps.unwrap_or(200);
+
+        println!(
+            "{} {} {} for {} (slippage: {}%)",
+            "🔄 Testing Swap:".bright_blue(),
+            amount_in.bright_white().bold(),
+            token_in.to_uppercase().bright_cyan(),
+            token_out.to_uppercase().bright_cyan(),
+            slippage_bps as f64 / 100.0
+        );
+
+        let result = mcp_client
+            .execute_swap(
+                from,
+                token_in,
+                token_out,
+                amount_in,
+                slippage_bps,
+                private_key,
+            )
+            .await?;
+        println!("{}", result.bright_green());
+    } else {
+        println!(
+            "{}",
+            "❌ Test command missing required parameters".bright_red()
+        );
+    }
+
     Ok(())
 }
 
@@ -185,9 +302,20 @@ fn print_help() {
     );
     println!();
     println!(
-        "  {} - Account aliases:",
-        "Available accounts:".bright_yellow().bold()
+        "  {} - Swap tokens using Uniswap",
+        "swap <amount> <token_in> for <token_out> from <address>".bright_cyan()
     );
+    println!(
+        "    Example: {}",
+        "Use Uniswap V2 Router to swap 10 ETH for USDC on Alice's account".italic()
+    );
+    println!();
+    println!(
+        "  {} - Manual test swap (bypasses Claude API)",
+        "test swap".bright_cyan()
+    );
+    println!();
+    println!("  {}:", "Available accounts".bright_yellow().bold());
     println!("    • Alice: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
     println!("    • Bob:   0x70997970C51812dc3A010C7d01b50e0d17dc79C8");
     println!("    • Carol: 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC");

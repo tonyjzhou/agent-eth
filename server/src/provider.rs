@@ -98,6 +98,78 @@ impl EthereumProvider {
 
         Ok(format!("{tx_hash:#x}"))
     }
+
+    pub async fn send_contract_transaction(
+        &self,
+        from_address: &str,
+        to_address: &str,
+        value_wei: &str,
+        calldata: &str,
+        private_key: &str,
+    ) -> Result<String> {
+        // Parse addresses
+        let from = Address::from_str(from_address)?;
+        let to = Address::from_str(to_address)?;
+
+        // Parse value
+        let value = if value_wei == "0" {
+            U256::ZERO
+        } else {
+            U256::from_str(value_wei)?
+        };
+
+        // Parse calldata
+        let data = hex::decode(calldata)?.into();
+
+        // Create signer from private key (remove 0x prefix if present)
+        let clean_private_key = private_key.strip_prefix("0x").unwrap_or(private_key);
+        let signer: PrivateKeySigner = clean_private_key.parse()?;
+
+        // Validate that the private key corresponds to the expected sender address
+        let signer_address = signer.address();
+        if signer_address != from {
+            return Err(anyhow::anyhow!(
+                "Private key mismatch: expected {}, but private key derives to {}",
+                from,
+                signer_address
+            ));
+        }
+
+        // Create wallet and provider with signer
+        let wallet = EthereumWallet::from(signer);
+        let provider_with_wallet = ProviderBuilder::new()
+            .wallet(wallet)
+            .connect_http(self.rpc_url.parse()?);
+
+        // Build and send transaction
+        let tx_request = alloy::rpc::types::eth::TransactionRequest::default()
+            .from(from)
+            .to(to)
+            .value(value)
+            .input(data);
+
+        let pending_tx = provider_with_wallet.send_transaction(tx_request).await?;
+        let tx_hash = *pending_tx.tx_hash();
+
+        // Wait for transaction to be mined
+        let _receipt = pending_tx.get_receipt().await?;
+
+        Ok(format!("{tx_hash:#x}"))
+    }
+
+    pub async fn call_contract(&self, contract_address: &str, calldata: &str) -> Result<String> {
+        let contract_addr = Address::from_str(contract_address)?;
+        let data = hex::decode(calldata)?.into();
+
+        let provider = ProviderBuilder::new().connect_http(self.rpc_url.parse()?);
+
+        let call_request = alloy::rpc::types::eth::TransactionRequest::default()
+            .to(contract_addr)
+            .input(data);
+
+        let result = provider.call(call_request).await?;
+        Ok(hex::encode(result))
+    }
 }
 
 #[cfg(test)]

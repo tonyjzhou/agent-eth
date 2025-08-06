@@ -18,6 +18,11 @@ pub struct ParsedCommand {
     pub to_address: Option<String>,
     pub amount: Option<String>,
     pub address: Option<String>,
+    pub token_in: Option<String>,
+    pub token_out: Option<String>,
+    pub amount_in: Option<String>,
+    pub slippage_bps: Option<u16>,
+    pub token: Option<String>,
 }
 
 impl EthereumAgent {
@@ -54,6 +59,14 @@ For balance queries:
 {
   "action": "balance",
   "address": "0x...",
+  "token": "ETH"
+}
+
+For token balance queries:
+{
+  "action": "balance", 
+  "address": "0x...",
+  "token": "USDC"
 }
 
 For transfers:
@@ -69,6 +82,21 @@ For contract checks:
   "action": "contract_check",
   "address": "0x..."
 }
+
+For token swaps (including Uniswap commands):
+{
+  "action": "swap",
+  "from_address": "0x...",
+  "token_in": "ETH",
+  "token_out": "USDC", 
+  "amount_in": "10.0",
+  "slippage_bps": 200
+}
+
+Examples of swap commands to recognize:
+- "Use Uniswap V2 Router to swap 10 ETH for USDC on Alice's account"
+- "Swap 5 ETH for USDC from Bob's account"  
+- "Convert 1000 USDC to ETH using Alice"
 
 Account aliases (resolve these to hex addresses):
 - Alice: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
@@ -139,11 +167,12 @@ IMPORTANT: Always use "action" as the field name, never "command". Response must
             }
         }
 
-        let parsed: ParsedCommand = serde_json::from_value(json_value).map_err(|e| {
+        let parsed: ParsedCommand = serde_json::from_value(json_value.clone()).map_err(|e| {
             anyhow::anyhow!(
-                "Failed to parse normalized JSON as ParsedCommand: {}\nOriginal response: {}",
+                "Failed to parse normalized JSON as ParsedCommand: {}\nOriginal response: {}\nNormalized JSON: {}",
                 e,
-                content
+                content,
+                serde_json::to_string_pretty(&json_value).unwrap_or_default()
             )
         })?;
 
