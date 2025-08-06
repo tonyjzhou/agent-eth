@@ -159,6 +159,14 @@ impl ContractInteraction {
         };
         Ok(call.abi_encode())
     }
+
+    pub fn encode_get_amounts_out(&self, amount_in: U256, path: Vec<Address>) -> Result<Vec<u8>> {
+        let call = IUniswapV2Router02::getAmountsOutCall {
+            amountIn: amount_in,
+            path,
+        };
+        Ok(call.abi_encode())
+    }
 }
 
 #[cfg(test)]

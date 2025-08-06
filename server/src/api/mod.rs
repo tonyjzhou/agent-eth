@@ -6,13 +6,6 @@ use std::env;
 use tracing::{debug, info};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TokenPrice {
-    pub symbol: String,
-    pub price_usd: f64,
-    pub last_updated: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct ContractAddress {
     pub name: String,
     pub address: String,
@@ -102,79 +95,6 @@ impl ApiClient {
         };
 
         Ok(addresses)
-    }
-
-    pub async fn get_token_price(&self, token_symbol: &str) -> Result<TokenPrice> {
-        debug!("Getting price for token: {}", token_symbol);
-
-        // Try external API first, then fallback to hardcoded prices
-        if let Ok(price) = self.try_external_price(token_symbol).await {
-            return Ok(price);
-        }
-
-        // Fallback to hardcoded prices for testing
-        self.get_fallback_price(token_symbol)
-    }
-
-    async fn try_external_price(&self, token_symbol: &str) -> Result<TokenPrice> {
-        let symbol_map = match token_symbol.to_lowercase().as_str() {
-            "usdc" => "usd-coin",
-            "weth" => "weth",
-            "ethereum" | "eth" => "ethereum",
-            _ => token_symbol,
-        };
-
-        let url = format!(
-            "https://api.coingecko.com/api/v3/simple/price?ids={symbol_map}&vs_currencies=usd"
-        );
-
-        let response = self.client.get(&url).send().await?;
-
-        let price_data: Value = response.json().await?;
-
-        if let Some(token_data) = price_data.get(symbol_map) {
-            if let Some(price) = token_data.get("usd").and_then(|p| p.as_f64()) {
-                return Ok(TokenPrice {
-                    symbol: token_symbol.to_uppercase(),
-                    price_usd: price,
-                    last_updated: Some(
-                        std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs()
-                            .to_string(),
-                    ),
-                });
-            }
-        }
-
-        Err(anyhow::anyhow!(
-            "External price API failed for {}",
-            token_symbol
-        ))
-    }
-
-    fn get_fallback_price(&self, token_symbol: &str) -> Result<TokenPrice> {
-        debug!("Using fallback prices for: {}", token_symbol);
-
-        let (price, symbol) = match token_symbol.to_lowercase().as_str() {
-            "usdc" | "usd-coin" => (1.0, "USDC"),
-            "weth" | "ethereum" | "eth" => (3200.0, "ETH"), // Approximate ETH price
-            "wbtc" | "bitcoin" => (95000.0, "WBTC"),
-            "dai" => (1.0, "DAI"),
-            _ => {
-                return Err(anyhow::anyhow!(
-                    "No fallback price available for {}",
-                    token_symbol
-                ))
-            }
-        };
-
-        Ok(TokenPrice {
-            symbol: symbol.to_string(),
-            price_usd: price,
-            last_updated: Some("fallback".to_string()),
-        })
     }
 
     fn extract_ethereum_address(&self, text: &str) -> Option<String> {
