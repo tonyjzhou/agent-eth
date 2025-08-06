@@ -48,34 +48,36 @@ impl EthereumAgent {
     pub async fn parse_command(&self, user_input: &str) -> Result<ParsedCommand> {
         let system_prompt = r#"You are an Ethereum blockchain assistant that helps users interact with the blockchain using natural language.
 
-Your job is to:
-1. Parse user requests into structured commands
-2. Handle account aliases (Alice = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266, Bob = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8, etc.)
-3. Convert amounts to proper format
-4. Extract addresses and validate them
+Parse user requests into JSON with EXACTLY this structure. Use "action" (not "command") as the field name:
 
-Available actions:
-- balance: Get balance of an address
-- transfer: Send ETH from one address to another
-- contract_check: Check if a contract is deployed
+For balance queries:
+{
+  "action": "balance",
+  "address": "0x...",
+}
 
-Account aliases:
+For transfers:
+{
+  "action": "transfer", 
+  "from_address": "0x...",
+  "to_address": "0x...",
+  "amount": "1.0"
+}
+
+For contract checks:
+{
+  "action": "contract_check",
+  "address": "0x..."
+}
+
+Account aliases (resolve these to hex addresses):
 - Alice: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 - Bob: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
 - Carol: 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
 
-For transfer commands, you need:
-- from_address (default to Alice if not specified)
-- to_address
-- amount (in ETH)
-
-Always respond with a JSON object describing the parsed command."#;
+IMPORTANT: Always use "action" as the field name, never "command". Response must be valid JSON only."#;
 
         let messages = json!([
-            {
-                "role": "system",
-                "content": system_prompt
-            },
             {
                 "role": "user",
                 "content": format!("Parse this user command into a structured format: {}\n\nRespond with JSON only.", user_input)
@@ -91,6 +93,7 @@ Always respond with a JSON object describing the parsed command."#;
             .json(&json!({
                 "model": "claude-3-5-sonnet-20241022",
                 "max_tokens": 1024,
+                "system": system_prompt,
                 "messages": messages
             }))
             .send()
@@ -99,11 +102,50 @@ Always respond with a JSON object describing the parsed command."#;
         let response_text = response.text().await?;
         let response_json: serde_json::Value = serde_json::from_str(&response_text)?;
 
+        // Check for API errors first
+        if let Some(error) = response_json.get("error") {
+            return Err(anyhow::anyhow!(
+                "Claude API error: {}",
+                error
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("Unknown error")
+            ));
+        }
+
         let content = response_json["content"][0]["text"]
             .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Invalid response format"))?;
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Invalid response format - expected content[0].text in API response"
+                )
+            })?;
 
-        let parsed: ParsedCommand = serde_json::from_str(content)?;
+        // Parse as generic JSON first to normalize field names
+        let mut json_value: serde_json::Value = serde_json::from_str(content).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to parse Claude response as JSON: {}\nResponse was: {}",
+                e,
+                content
+            )
+        })?;
+
+        // Normalize "command" to "action" for backward compatibility
+        if let Some(obj) = json_value.as_object_mut() {
+            if obj.contains_key("command") && !obj.contains_key("action") {
+                if let Some(command_value) = obj.remove("command") {
+                    obj.insert("action".to_string(), command_value);
+                }
+            }
+        }
+
+        let parsed: ParsedCommand = serde_json::from_value(json_value).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to parse normalized JSON as ParsedCommand: {}\nOriginal response: {}",
+                e,
+                content
+            )
+        })?;
 
         // Resolve aliases
         let mut resolved = parsed;

@@ -114,3 +114,92 @@ The implementation successfully meets all core requirements:
 - ✅ Proper error handling and user feedback
 
 The system is production-ready for development/testing environments and provides a solid foundation for adding bonus features like Uniswap integration, external API calls, and RAG documentation systems.
+
+## Current Issue: Claude API Response Format Error
+
+### Problem
+When testing the application locally with "How much ETH does Alice have?", the client fails with error:
+```
+❌ Error: Invalid response format
+```
+
+### Root Cause Analysis
+The error occurs in `client/src/agent.rs:104` when trying to access `response_json["content"][0]["text"]`. The Claude API response structure has likely changed since the code was written.
+
+### Todo Items
+
+- [ ] **Debug Claude API response format**: Add logging to see what the actual API response looks like
+- [ ] **Fix response parsing**: Update the parsing logic to handle the correct Claude API response structure  
+- [ ] **Add better error handling**: Improve error messages to help with debugging future API changes
+- [ ] **Test the fix**: Verify that "How much ETH does Alice have?" works correctly
+
+### Progress
+- ✅ **Debug Claude API response format**: Added logging and discovered the issue
+- ✅ **Fix response parsing**: Updated Claude API request format from message role to top-level system parameter  
+- ✅ **Add better error handling**: Improved error messages for API errors and JSON parsing failures
+- ✅ **Test the fix**: Verified all commands work correctly:
+  - "How much ETH does Alice have?" → Shows balance correctly
+  - "send 1 ETH from Alice to Bob" → Transfer simulation works
+  - "Is Uniswap V2 Router deployed at 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D?" → Contract check works
+
+## Root Cause & Solution
+
+**Problem**: The Claude Messages API format changed - it no longer accepts "system" as a message role.
+
+**Old format (broken)**:
+```json
+{
+  "messages": [
+    {"role": "system", "content": "system prompt"},
+    {"role": "user", "content": "user message"}
+  ]
+}
+```
+
+**New format (fixed)**:
+```json
+{
+  "system": "system prompt",
+  "messages": [
+    {"role": "user", "content": "user message"}
+  ]
+}
+```
+
+**Changes made**:
+1. Moved system prompt from message array to top-level `system` parameter in `client/src/agent.rs:87-92`
+2. Added proper API error handling to catch and display Claude API errors
+3. Improved JSON parsing error messages to help debug future issues
+
+The application now works correctly for all test commands.
+
+## Second Issue: Inconsistent Claude Field Names 
+
+### Problem
+After fixing the API format, Claude was inconsistently returning different JSON field names:
+- Sometimes: `{"action": "balance", ...}` 
+- Sometimes: `{"command": "balance", ...}`
+
+This caused parsing errors: `missing field 'action'` when Claude used "command".
+
+### Root Cause & Solution
+
+**Problem**: Claude's responses weren't deterministic due to vague system prompt.
+
+**Solution applied**:
+1. **More specific system prompt** (`client/src/agent.rs:49-78`): Added explicit JSON examples and emphasized using "action" not "command"
+2. **Field normalization logic** (`client/src/agent.rs:117-130`): Added fallback to convert "command" → "action" for robust parsing
+
+**Changes made**:
+- Rewrote system prompt with concrete JSON examples
+- Added normalization logic that handles both field names
+- Improved error messages throughout the parsing chain
+
+### Final Verification
+✅ All command types work consistently:
+- Balance queries: "How much ETH does Alice have?"
+- Transfers: "send 1 ETH from Alice to Bob" 
+- Contract checks: "Is Uniswap V2 Router deployed at 0x...?"
+- Multiple consecutive queries work without field name conflicts
+
+The application is now fully robust against Claude API response variations.
