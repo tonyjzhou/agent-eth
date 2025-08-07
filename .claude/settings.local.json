@@ -27,7 +27,13 @@
       "WebFetch(domain:docs.uniswap.org)",
       "WebFetch(domain:dev.to)",
       "Bash(ANTHROPIC_API_KEY=\"dummy_key_for_testing\" cargo run --bin client)",
-      "Bash(ANTHROPIC_API_KEY=\"dummy_key_for_testing\" timeout 10 cargo run)"
+      "Bash(ANTHROPIC_API_KEY=\"dummy_key_for_testing\" timeout 10 cargo run)",
+      "Bash(ANTHROPIC_API_KEY=\"dummy_key_for_testing\" timeout 10 cargo run --bin client)",
+      "Bash(ANTHROPIC_API_KEY=\"dummy_key_for_testing\" cargo run)",
+      "Bash(rustc:*)",
+      "Bash(./test_fix)",
+      "Bash(rm:*)",
+      "Bash(./test_classification)"
     ],
     "deny": []
   }

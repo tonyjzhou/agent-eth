@@ -85,29 +85,73 @@ impl EthereumAgent {
     }
 
     pub async fn is_documentation_query(&self, input: &str) -> bool {
+        let input_lower = input.to_lowercase();
+
+        // First check for clear documentation indicators - if present, it's a doc query
         let doc_keywords = [
-            "how",
-            "what",
-            "explain",
-            "difference",
+            "explain how",
+            "what is the difference",
+            "how do i",
+            "how does",
             "documentation",
-            "docs",
-            "contract",
-            "interface",
-            "function",
-            "slippage",
-            "uniswap",
-            "router",
-            "exactinput",
-            "exactoutput",
-            "swap",
-            "pool",
+            "docs ",
+            "what are the steps",
+            "how to calculate",
+            "what does this mean",
+            "difference between",
         ];
 
-        let input_lower = input.to_lowercase();
-        doc_keywords
+        if doc_keywords
             .iter()
             .any(|&keyword| input_lower.contains(keyword))
+        {
+            return true;
+        }
+
+        // Then check if this looks like a blockchain operation - if so, it's NOT a doc query
+        let blockchain_patterns = [
+            // Balance queries
+            "much eth",
+            "much usdc",
+            "much token",
+            "eth does",
+            "usdc does",
+            "token does",
+            "balance of",
+            "balance for",
+            // Transfer operations
+            "send",
+            "transfer",
+            "from alice",
+            "from bob",
+            "from carol",
+            "to alice",
+            "to bob",
+            "to carol",
+            // Swap operations with specific patterns that indicate actual swaps
+            "swap 10",
+            "swap 1 ",
+            "swap 0.", // for decimal amounts
+            "use uniswap",
+            "uniswap v2 router",
+            "for usdc",
+            "for eth",
+            "for weth",
+            // Contract operations
+            "deployed at",
+            "contract at",
+            "check contract",
+        ];
+
+        if blockchain_patterns
+            .iter()
+            .any(|&pattern| input_lower.contains(pattern))
+        {
+            return false;
+        }
+
+        // Default to false for anything else (neither clear doc query nor blockchain operation)
+        false
     }
 
     pub async fn parse_command(&self, user_input: &str) -> Result<ParsedCommand> {
