@@ -112,9 +112,21 @@ impl VectorStorage {
         let search_results = scored_results
             .into_iter()
             .map(|(document, _score)| {
-                let relevant_chunk = if document.content.len() > 500 {
-                    format!("{}...", &document.content[..500])
+                // For chunks, use the entire content since they're already reasonably sized
+                // Add score information to help with debugging
+                let relevant_chunk = if document.content.len() > 2000 {
+                    // If somehow we have a very large chunk, truncate intelligently
+                    let truncated = &document.content[..2000];
+                    // Try to end at a sentence or paragraph boundary
+                    if let Some(last_period) = truncated.rfind(". ") {
+                        format!("{}.", &truncated[..last_period])
+                    } else if let Some(last_newline) = truncated.rfind("\n\n") {
+                        truncated[..last_newline].to_string()
+                    } else {
+                        format!("{truncated}...")
+                    }
                 } else {
+                    // Use full content for reasonably sized chunks
                     document.content.clone()
                 };
 

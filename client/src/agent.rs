@@ -61,7 +61,8 @@ impl EthereumAgent {
 
     pub async fn search_docs(&self, query: &str) -> Result<Vec<crate::rag::SearchResult>> {
         if let Some(rag) = &self.rag {
-            rag.search(query, 5).await
+            // Increase limit since we now have more focused chunks
+            rag.search(query, 15).await
         } else {
             Ok(vec![])
         }
@@ -116,11 +117,19 @@ impl EthereumAgent {
             if let Ok(search_results) = self.search_docs(user_input).await {
                 if !search_results.is_empty() {
                     additional_context = "\n\nRelevant Documentation Context:\n".to_string();
-                    for result in search_results.iter().take(3) {
+                    for result in search_results.iter().take(5) {
+                        // Show more context since chunks are now better organized
+                        let chunk_preview = if result.relevant_chunk.len() > 800 {
+                            format!(
+                                "{}...",
+                                result.relevant_chunk.chars().take(800).collect::<String>()
+                            )
+                        } else {
+                            result.relevant_chunk.clone()
+                        };
                         additional_context.push_str(&format!(
-                            "- {}: {}\n",
-                            result.document.title,
-                            result.relevant_chunk.chars().take(200).collect::<String>()
+                            "Document: {} ({})\n{}\n\n",
+                            result.document.title, result.document.source, chunk_preview
                         ));
                     }
                 }
@@ -285,12 +294,12 @@ IMPORTANT: Always use "action" as the field name, never "command". Response must
             );
         }
 
-        // Build context from search results
+        // Build context from search results - use more results since chunks are better organized
         let mut context = String::new();
-        for result in search_results.iter().take(3) {
+        for result in search_results.iter().take(8) {
             context.push_str(&format!(
-                "From {}:\n{}\n\n",
-                result.document.title, result.relevant_chunk
+                "Source: {} ({})\n{}\n\n---\n\n",
+                result.document.title, result.document.source, result.relevant_chunk
             ));
         }
 

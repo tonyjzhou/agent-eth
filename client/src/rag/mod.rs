@@ -54,8 +54,22 @@ impl RagSystem {
         Ok(results)
     }
 
+    #[allow(dead_code)]
     pub async fn add_document(&mut self, document: DocumentMetadata) -> Result<()> {
         let embedding = self.embeddings.embed_text(&document.content).await?;
+        self.storage.insert_document(document, embedding).await?;
+        Ok(())
+    }
+
+    pub async fn generate_embeddings_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+        self.embeddings.embed_batch(texts).await
+    }
+
+    pub async fn store_document_with_embedding(
+        &mut self,
+        document: DocumentMetadata,
+        embedding: Vec<f32>,
+    ) -> Result<()> {
         self.storage.insert_document(document, embedding).await?;
         Ok(())
     }

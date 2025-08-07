@@ -1,48 +1,127 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::env;
+
+#[derive(Debug, Serialize)]
+struct EmbeddingBatchRequest {
+    input: Vec<String>,
+    model: String,
+    encoding_format: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct EmbeddingResponse {
+    data: Vec<EmbeddingData>,
+}
+
+#[derive(Debug, Deserialize)]
+struct EmbeddingData {
+    embedding: Vec<f32>,
+}
 
 #[derive(Debug)]
 pub struct EmbeddingService {
-    // Simple mock embedding service for now
-    _placeholder: String,
+    client: Client,
+    api_key: String,
+    model: String,
 }
 
 impl EmbeddingService {
     pub async fn new() -> Result<Self> {
+        let api_key = env::var("OPENAI_API_KEY").context(
+            "OPENAI_API_KEY environment variable is required for embeddings. Please set it to use the RAG system.",
+        )?;
+
+        let client = Client::new();
+        let model = "text-embedding-3-small".to_string();
+
         Ok(Self {
-            _placeholder: "mock_embedding_service".to_string(),
+            client,
+            api_key,
+            model,
         })
     }
 
     pub async fn embed_text(&self, text: &str) -> Result<Vec<f32>> {
-        // Simple deterministic embedding based on text content
-        // This is a mock implementation for testing
-        let mut embedding = vec![0.0; 384];
-
-        let bytes = text.as_bytes();
-        for (i, &byte) in bytes.iter().enumerate() {
-            if i < 384 {
-                embedding[i] = (byte as f32 / 255.0) * 2.0 - 1.0; // Normalize to [-1, 1]
-            }
-        }
-
-        // Add some variation based on text length and content
-        let text_hash = self.simple_hash(text);
-        for (i, item) in embedding.iter_mut().enumerate().take(384) {
-            *item += ((text_hash + i) as f32 % 100.0) / 1000.0;
-        }
-
-        // Normalize the vector
-        let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if norm > 0.0 {
-            for val in embedding.iter_mut() {
-                *val /= norm;
-            }
-        }
-
-        Ok(embedding)
+        let embeddings = self.embed_batch(&[text.to_string()]).await?;
+        embeddings
+            .into_iter()
+            .next()
+            .context("No embedding returned from batch request")
     }
 
-    fn simple_hash(&self, text: &str) -> usize {
-        text.bytes().map(|b| b as usize).sum()
+    pub async fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+        if texts.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // OpenAI supports up to 2048 inputs per request for embeddings
+        const BATCH_SIZE: usize = 100; // Conservative batch size
+        let mut all_embeddings = Vec::new();
+
+        let total_batches = texts.len().div_ceil(BATCH_SIZE);
+        println!(
+            "🔄 Processing {} texts in {} batches of up to {} items each...",
+            texts.len(),
+            total_batches,
+            BATCH_SIZE
+        );
+
+        for (batch_idx, chunk) in texts.chunks(BATCH_SIZE).enumerate() {
+            print!(
+                "📦 Batch {}/{} ({} texts)... ",
+                batch_idx + 1,
+                total_batches,
+                chunk.len()
+            );
+            std::io::Write::flush(&mut std::io::stdout()).unwrap();
+            let request = EmbeddingBatchRequest {
+                input: chunk.to_vec(),
+                model: self.model.clone(),
+                encoding_format: "float".to_string(),
+            };
+
+            let response = self
+                .client
+                .post("https://api.openai.com/v1/embeddings")
+                .header("Authorization", format!("Bearer {}", self.api_key))
+                .header("Content-Type", "application/json")
+                .json(&request)
+                .send()
+                .await
+                .context("Failed to send batch embedding request to OpenAI")?;
+
+            if !response.status().is_success() {
+                let status = response.status();
+                let error_text = response
+                    .text()
+                    .await
+                    .unwrap_or_else(|_| "Unknown error".to_string());
+                return Err(anyhow::anyhow!(
+                    "OpenAI API request failed with status {}: {}",
+                    status,
+                    error_text
+                ));
+            }
+
+            let embedding_response: EmbeddingResponse = response
+                .json()
+                .await
+                .context("Failed to parse embedding response from OpenAI")?;
+
+            for data in embedding_response.data {
+                all_embeddings.push(data.embedding);
+            }
+
+            println!("✅ Done");
+
+            // Small delay to avoid rate limiting
+            if batch_idx + 1 < total_batches {
+                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+            }
+        }
+
+        Ok(all_embeddings)
     }
 }
