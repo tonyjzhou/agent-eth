@@ -1,18 +1,20 @@
 # Agent-ETH: AI Agent for Ethereum Blockchain
 
-An AI-powered agent system that allows users to interact with Ethereum blockchain using natural language commands. Built with RIG framework for AI agents and Model Context Protocol (MCP) for tool integration.
+An AI-powered agent system that allows users to interact with Ethereum blockchain using natural language commands. Features a CLI client with Anthropic Claude integration and an HTTP server exposing Ethereum tools.
 
 ## Architecture
 
 ```
-             ┌─────────────────┐    MCP Protocol    ┌──────────────────┐
-             │   RIG Agent     │◄──────────────────►│   MCP Server     │
-             │   (Client)      │                    │                  │
+             ┌─────────────────┐   JSON/HTTP API   ┌──────────────────┐
+             │   CLI Client    │◄──────────────────►│   HTTP Server    │
+             │                 │                    │                  │
              ├─────────────────┤                    ├──────────────────┤
-User   ◄───► │ • CLI REPL      │                    │ • Foundry - Cast │
-Claude ◄───► │ • LLM API Key   │                    │ • Tx Generation  │
-             │ • User Input    │                    │ • State Fork     │
-             │ • Response      │                    │ • Anthropic SDK  │
+User   ◄───► │ • Interactive   │                    │ • Balance Tool   │
+Claude ◄───► │   REPL          │                    │ • Transfer Tool  │
+             │ • Claude API    │                    │ • Contract Tool  │
+             │ • RAG System    │                    │ • Swap Tool      │
+             │ • Account       │                    │ • Alloy Provider │
+             │   Aliases       │                    │ • External APIs  │
              └─────────────────┘                    └──────────────────┘
                       │                                       │
                       │                                       │
@@ -21,7 +23,7 @@ Claude ◄───► │ • LLM API Key   │                    │ • Tx G
                                  ┌────▼───────────▼──────┐
                                  │   Forked Ethereum     │
                                  │     Test Network      │
-                                 │   (via Foundry)       │
+                                 │      (Anvil)          │
                                  └───────────────────────┘
 ```
 
@@ -64,7 +66,7 @@ Claude ◄───► │ • LLM API Key   │                    │ • Tx G
    ```
 
 2. The build will create two binaries:
-   - `./target/release/agent-eth-server` (MCP Server)
+   - `./target/release/agent-eth-server` (HTTP Server)
    - `./target/release/agent-eth-client` (CLI Client)
 
 ## Usage
@@ -74,9 +76,14 @@ Claude ◄───► │ • LLM API Key   │                    │ • Tx G
    anvil --fork-url https://eth-mainnet.g.alchemy.com/v2/4UjEl1ULr2lQYsGR5n7gGKd3pzgAzxKs
    ```
 
-2. **Run the client**:
+2. **Start the HTTP server** (in another terminal):
    ```bash
-   ./target/release/agent-eth-client
+   cd server && cargo run
+   ```
+
+3. **Run the client**:
+   ```bash
+   cd client && ANTHROPIC_API_KEY="your-key" cargo run
    ```
 
 3. **Example Commands**:
@@ -132,28 +139,28 @@ Each account starts with 10,000 ETH on the local fork.
 ```
 agent-eth/
 ├── Cargo.toml              # Workspace configuration
-├── client/                 # RIG Agent Client
+├── client/                 # CLI Agent Client
 │   ├── Cargo.toml
 │   ├── docs/               # Uniswap documentation for RAG
 │   └── src/
 │       ├── main.rs         # CLI REPL interface
-│       ├── agent.rs        # RIG agent implementation
-│       ├── mcp_client.rs   # MCP client
+│       ├── agent.rs        # Claude API integration
+│       ├── mcp_client.rs   # HTTP client for server communication
 │       └── rag/            # RAG system implementation
 │           ├── mod.rs      # RAG system core
 │           ├── embeddings.rs # Embedding service
 │           ├── ingestion.rs  # Document ingestion
 │           └── storage.rs  # Vector storage
-├── server/                 # MCP Server
+├── server/                 # HTTP Server (Axum-based)
 │   ├── Cargo.toml
 │   └── src/
-│       ├── main.rs         # MCP server main
-│       ├── provider.rs     # Ethereum provider
-│       └── tools/          # MCP tools
-│           ├── balance.rs
-│           ├── transfer.rs
-│           ├── contract_check.rs
-│           └── swap.rs
+│       ├── main.rs         # HTTP server with endpoints
+│       ├── provider.rs     # Ethereum provider (Alloy)
+│       └── tools/          # Blockchain tools
+│           ├── balance.rs    # Balance checking
+│           ├── transfer.rs   # ETH transfers
+│           ├── contract_check.rs # Contract verification
+│           └── swap.rs       # Token swaps
 └── README.md
 ```
 
@@ -164,7 +171,13 @@ agent-eth/
    anvil --fork-url https://eth-mainnet.g.alchemy.com/v2/4UjEl1ULr2lQYsGR5n7gGKd3pzgAzxKs
    ```
 
-2. **Terminal 2** - Run the client:
+2. **Terminal 2** - Start the HTTP server:
+   ```bash
+   cd server
+   cargo run
+   ```
+
+3. **Terminal 3** - Run the client:
    ```bash
    cd client
    ANTHROPIC_API_KEY="your-key" cargo run
@@ -180,19 +193,19 @@ agent-eth/
 
 ### Components
 
-1. **RIG Agent (Client)**:
-   - Uses RIG framework for AI agent functionality
-   - Integrates with Anthropic Claude API
-   - Parses natural language into structured commands
-   - Handles account aliases and address resolution
+1. **CLI Client**:
+   - Interactive REPL using rustyline with colored output
+   - Direct Anthropic Claude API integration for natural language parsing
+   - Account alias resolution (Alice, Bob, Carol → hex addresses)
+   - HTTP client for communicating with server
    - RAG system for documentation search with vector embeddings
 
-2. **MCP Server**:
-   - Implements Model Context Protocol for tool exposure
-   - Uses alloy for Ethereum interactions (migrated from ethers-rs)
-   - Provides tools for balance, transfer, contract checking, and token swaps
+2. **HTTP Server**:
+   - Axum-based HTTP server exposing Ethereum tools
+   - Uses alloy for Ethereum blockchain interactions
+   - Four main endpoints: /balance, /transfer, /contract_check, /swap
    - External API integration for contract discovery and token pricing
-   - Connects to local Anvil fork
+   - Connects to local Anvil fork on http://127.0.0.1:8545
 
 3. **RAG System**:
    - Vector database for document storage and similarity search
@@ -201,14 +214,64 @@ agent-eth/
    - Natural language querying of technical documentation
 
 4. **Communication**:
-   - Client and server communicate via JSON over HTTP (simplified from MCP)
+   - Client and server communicate via JSON over HTTP
+   - RESTful endpoints: GET /balance, POST /transfer, POST /contract_check, POST /swap
    - Async/await throughout for non-blocking operations
+   - Error handling with HTTP status codes and JSON error responses
 
 ### Security Notes
 
 - Private keys are hardcoded for test accounts only
 - Never use these private keys on mainnet
 - The system is designed for local development and testing
+
+## Communication Protocol Analysis
+
+Agent-ETH uses JSON over HTTP for client-server communication instead of the Model Context Protocol (MCP). Here's a detailed analysis of both approaches:
+
+### Current Approach: JSON over HTTP
+
+**Advantages:**
+- **Simplicity**: Direct HTTP endpoints are easier to understand and debug
+- **Language Agnostic**: Any HTTP client can interact with the server
+- **Familiar Patterns**: Standard REST-like API that most developers know
+- **Debugging**: Easy to test with curl, Postman, or browser dev tools
+- **Lightweight**: No additional protocol overhead or complexity
+- **Custom Control**: Full control over request/response format and error handling
+
+**Disadvantages:**
+- **No Standardization**: Custom protocol means reinventing conventions
+- **Limited Discoverability**: No built-in way for clients to discover available tools
+- **Manual Schema Management**: Need to manually keep client/server schemas in sync
+- **No Metadata**: Missing rich tool descriptions, parameter validation, etc.
+- **Scaling Complexity**: Adding new tools requires manual updates across multiple files
+
+### Alternative: Model Context Protocol (MCP)
+
+**Advantages:**
+- **Standardized**: Well-defined protocol with established patterns
+- **Tool Discovery**: Automatic discovery of available tools and their schemas
+- **Rich Metadata**: Built-in support for tool descriptions, parameter validation
+- **Ecosystem**: Can leverage existing MCP tooling and libraries
+- **Type Safety**: Better schema validation and error handling
+- **Bidirectional Communication**: Support for notifications and streaming
+
+**Disadvantages:**
+- **Complexity**: More complex to implement and understand
+- **Learning Curve**: Developers need to learn MCP-specific concepts
+- **Overhead**: Additional protocol layer adds complexity
+- **Debugging**: Harder to debug without MCP-specific tools
+- **Dependencies**: Requires MCP libraries and tooling
+
+### Design Decision Context
+
+For Agent-ETH's use case (simple blockchain operations with 4 endpoints), the HTTP approach makes sense for:
+- **Rapid Prototyping**: Quick to implement and iterate
+- **Educational Purposes**: Easy to understand the communication flow
+- **Minimal Dependencies**: Fewer external libraries required
+- **Development Speed**: Faster initial development cycle
+
+However, as the system scales with more tools and features, MCP's standardization and discoverability benefits would become increasingly valuable for maintainability and extensibility.
 
 ## Troubleshooting
 
