@@ -52,12 +52,26 @@ impl EthereumMcpServer {
             return Ok(());
         }
 
+        tracing::debug!("Server received message: {}", message);
+
         let request: Value = serde_json::from_str(message)?;
+
+        // Check if this is a notification (has no id field) - if so, don't send a response
+        let is_notification = request.get("id").is_none();
+
         let response = self.process_request(request).await;
 
-        let response_str = format!("{}\n", serde_json::to_string(&response)?);
-        stdout.write_all(response_str.as_bytes()).await?;
-        stdout.flush().await?;
+        if !is_notification {
+            tracing::debug!(
+                "Server sending response: {}",
+                serde_json::to_string(&response)?
+            );
+            let response_str = format!("{}\n", serde_json::to_string(&response)?);
+            stdout.write_all(response_str.as_bytes()).await?;
+            stdout.flush().await?;
+        } else {
+            tracing::debug!("Notification received, no response sent");
+        }
 
         Ok(())
     }

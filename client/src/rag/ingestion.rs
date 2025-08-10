@@ -6,6 +6,12 @@ use walkdir::WalkDir;
 
 pub struct DocumentIngestion;
 
+impl Default for DocumentIngestion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DocumentIngestion {
     pub fn new() -> Self {
         Self

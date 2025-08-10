@@ -1,12 +1,12 @@
 # Agent-ETH: AI Agent for Ethereum Blockchain
 
-An AI-powered agent system that allows users to interact with Ethereum blockchain using natural language commands. Features a CLI client with Anthropic Claude integration and an HTTP server exposing Ethereum tools.
+An AI-powered agent system that allows users to interact with Ethereum blockchain using natural language commands. Features a CLI client with Anthropic Claude integration and an MCP server exposing Ethereum tools.
 
 ## Architecture
 
 ```
-             ┌─────────────────┐   JSON/HTTP API   ┌──────────────────┐
-             │   CLI Client    │◄──────────────────►│   HTTP Server    │
+             ┌─────────────────┐   MCP over stdio   ┌──────────────────┐
+             │   CLI Client    │◄──────────────────►│   MCP Server     │
              │                 │                    │                  │
              ├─────────────────┤                    ├──────────────────┤
 User   ◄───► │ • Interactive   │                    │ • Balance Tool   │
@@ -15,6 +15,7 @@ Claude ◄───► │   REPL          │                    │ • Transf
              │ • RAG System    │                    │ • Swap Tool      │
              │ • Account       │                    │ • Alloy Provider │
              │   Aliases       │                    │ • External APIs  │
+             │ • MCP Client    │                    │ • JSON-RPC 2.0   │
              └─────────────────┘                    └──────────────────┘
                       │                                       │
                       │                                       │
@@ -66,7 +67,7 @@ Claude ◄───► │   REPL          │                    │ • Transf
    ```
 
 2. The build will create two binaries:
-   - `./target/release/agent-eth-server` (HTTP Server)
+   - `./target/release/agent-eth-server` (MCP Server)
    - `./target/release/agent-eth-client` (CLI Client)
 
 ## Usage
@@ -76,15 +77,12 @@ Claude ◄───► │   REPL          │                    │ • Transf
    anvil --fork-url https://eth-mainnet.g.alchemy.com/v2/4UjEl1ULr2lQYsGR5n7gGKd3pzgAzxKs
    ```
 
-2. **Start the HTTP server** (in another terminal):
+2. **Run the client** (from the workspace root):
    ```bash
-   cd server && cargo run
+   ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client
    ```
 
-3. **Run the client**:
-   ```bash
-   cd client && ANTHROPIC_API_KEY="your-key" cargo run
-   ```
+   **Note**: The client automatically spawns the MCP server as a subprocess, so no separate server process is needed.
 
 3. **Example Commands**:
    ```
@@ -144,23 +142,31 @@ agent-eth/
 │   ├── docs/               # Uniswap documentation for RAG
 │   └── src/
 │       ├── main.rs         # CLI REPL interface
+│       ├── lib.rs          # Library exports
 │       ├── agent.rs        # Claude API integration
-│       ├── mcp_client.rs   # HTTP client for server communication
+│       ├── mcp_client.rs   # MCP client for server communication
+│       ├── bin/
+│       │   └── test_client.rs # Test client for debugging
 │       └── rag/            # RAG system implementation
 │           ├── mod.rs      # RAG system core
 │           ├── embeddings.rs # Embedding service
 │           ├── ingestion.rs  # Document ingestion
 │           └── storage.rs  # Vector storage
-├── server/                 # HTTP Server (Axum-based)
+├── server/                 # MCP Server
 │   ├── Cargo.toml
 │   └── src/
-│       ├── main.rs         # HTTP server with endpoints
+│       ├── main.rs         # MCP server with stdio transport
+│       ├── lib.rs          # Library exports
+│       ├── mcp_server.rs   # MCP protocol implementation
 │       ├── provider.rs     # Ethereum provider (Alloy)
+│       ├── bin/
+│       │   └── test_balance.rs # Test balance functionality
 │       └── tools/          # Blockchain tools
-│           ├── balance.rs    # Balance checking
+│           ├── mod.rs        # Module exports
+│           ├── token_balance.rs # Balance checking (ETH & ERC20)
 │           ├── transfer.rs   # ETH transfers
 │           ├── contract_check.rs # Contract verification
-│           └── swap.rs       # Token swaps
+│           └── swap.rs       # Token swaps via Uniswap
 └── README.md
 ```
 
@@ -171,17 +177,12 @@ agent-eth/
    anvil --fork-url https://eth-mainnet.g.alchemy.com/v2/4UjEl1ULr2lQYsGR5n7gGKd3pzgAzxKs
    ```
 
-2. **Terminal 2** - Start the HTTP server:
+2. **Terminal 2** - Run the client (from workspace root):
    ```bash
-   cd server
-   cargo run
+   ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client
    ```
 
-3. **Terminal 3** - Run the client:
-   ```bash
-   cd client
-   ANTHROPIC_API_KEY="your-key" cargo run
-   ```
+   The client will automatically spawn and communicate with the MCP server.
 
 ### Environment Variables
 
@@ -197,13 +198,13 @@ agent-eth/
    - Interactive REPL using rustyline with colored output
    - Direct Anthropic Claude API integration for natural language parsing
    - Account alias resolution (Alice, Bob, Carol → hex addresses)
-   - HTTP client for communicating with server
+   - MCP client for communicating with server via JSON-RPC 2.0 over stdio
    - RAG system for documentation search with vector embeddings
 
-2. **HTTP Server**:
-   - Axum-based HTTP server exposing Ethereum tools
-   - Uses alloy for Ethereum blockchain interactions
-   - Four main endpoints: /balance, /transfer, /contract_check, /swap
+2. **MCP Server**:
+   - Model Context Protocol compliant server exposing Ethereum tools
+   - Uses alloy for Ethereum blockchain interactions (migrated from ethers-rs)
+   - Four main tools: `get_balance`, `send_transfer`, `check_contract`, `execute_swap`
    - External API integration for contract discovery and token pricing
    - Connects to local Anvil fork on http://127.0.0.1:8545
 
@@ -214,10 +215,10 @@ agent-eth/
    - Natural language querying of technical documentation
 
 4. **Communication**:
-   - Client and server communicate via JSON over HTTP
-   - RESTful endpoints: GET /balance, POST /transfer, POST /contract_check, POST /swap
+   - Client and server communicate via Model Context Protocol (MCP) using JSON-RPC 2.0 over stdio transport
+   - Server runs as subprocess spawned by client
    - Async/await throughout for non-blocking operations
-   - Error handling with HTTP status codes and JSON error responses
+   - Error handling with MCP-compliant JSON-RPC error responses
 
 ### Security Notes
 
@@ -225,59 +226,109 @@ agent-eth/
 - Never use these private keys on mainnet
 - The system is designed for local development and testing
 
-## Communication Protocol Analysis
+## Model Context Protocol (MCP) Implementation
 
-Agent-ETH uses JSON over HTTP for client-server communication instead of the Model Context Protocol (MCP). Here's a detailed analysis of both approaches:
+Agent-ETH implements the Model Context Protocol (MCP) for client-server communication, providing a standardized way to expose Ethereum tools to AI agents.
 
-### Current Approach: JSON over HTTP
+### MCP Architecture
 
-**Advantages:**
-- **Simplicity**: Direct HTTP endpoints are easier to understand and debug
-- **Language Agnostic**: Any HTTP client can interact with the server
-- **Familiar Patterns**: Standard REST-like API that most developers know
-- **Debugging**: Easy to test with curl, Postman, or browser dev tools
-- **Lightweight**: No additional protocol overhead or complexity
-- **Custom Control**: Full control over request/response format and error handling
+**Client-Server Communication:**
+- **Protocol**: JSON-RPC 2.0 over stdio transport
+- **Process Model**: Client spawns server as subprocess 
+- **Message Flow**: Request/response with optional notifications
+- **Error Handling**: MCP-compliant error codes and messages
 
-**Disadvantages:**
-- **No Standardization**: Custom protocol means reinventing conventions
-- **Limited Discoverability**: No built-in way for clients to discover available tools
-- **Manual Schema Management**: Need to manually keep client/server schemas in sync
-- **No Metadata**: Missing rich tool descriptions, parameter validation, etc.
-- **Scaling Complexity**: Adding new tools requires manual updates across multiple files
+**Tool Discovery:**
+```json
+{
+  "jsonrpc": "2.0", 
+  "method": "tools/list",
+  "result": {
+    "tools": [
+      {
+        "name": "get_balance",
+        "description": "Get the balance of an Ethereum address for ETH or ERC20 tokens",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "address": {"type": "string", "description": "The Ethereum address to check"},
+            "token": {"type": "string", "description": "Token symbol (ETH or ERC20)", "default": "ETH"}
+          },
+          "required": ["address"]
+        }
+      }
+    ]
+  }
+}
+```
 
-### Alternative: Model Context Protocol (MCP)
+### Implementation Details
 
-**Advantages:**
-- **Standardized**: Well-defined protocol with established patterns
-- **Tool Discovery**: Automatic discovery of available tools and their schemas
-- **Rich Metadata**: Built-in support for tool descriptions, parameter validation
-- **Ecosystem**: Can leverage existing MCP tooling and libraries
-- **Type Safety**: Better schema validation and error handling
-- **Bidirectional Communication**: Support for notifications and streaming
+**Server Path Resolution:**
+- Default server path: `./target/debug/agent-eth-server` (relative to workspace root)
+- Configurable via `--server-command` CLI argument
+- **Important**: Client must be run from workspace root directory
 
-**Disadvantages:**
-- **Complexity**: More complex to implement and understand
-- **Learning Curve**: Developers need to learn MCP-specific concepts
-- **Overhead**: Additional protocol layer adds complexity
-- **Debugging**: Harder to debug without MCP-specific tools
-- **Dependencies**: Requires MCP libraries and tooling
+**Logging Configuration:**
+- Server logs to stderr to avoid stdout JSON corruption
+- Debug logging available via `RUST_LOG=debug` environment variable
+- Client includes debug logging for MCP request/response tracing
 
-### Design Decision Context
+**Error Handling:**
+- Server properly handles MCP notifications (no response sent)
+- Client includes detailed JSON parsing error messages
+- Graceful fallback for unexpected response formats
 
-For Agent-ETH's use case (simple blockchain operations with 4 endpoints), the HTTP approach makes sense for:
-- **Rapid Prototyping**: Quick to implement and iterate
-- **Educational Purposes**: Easy to understand the communication flow
-- **Minimal Dependencies**: Fewer external libraries required
-- **Development Speed**: Faster initial development cycle
+### Recent Bug Fixes
 
-However, as the system scales with more tools and features, MCP's standardization and discoverability benefits would become increasingly valuable for maintainability and extensibility.
+1. **Fixed Server Path Issue** (`client/src/main.rs:17`):
+   - Changed from `../target/debug/agent-eth-server` to `./target/debug/agent-eth-server`
+   - Ensures client can find server when run from workspace root
+
+2. **Fixed Logging Interference** (`server/src/main.rs:11-13`):
+   - Configured tracing to write to stderr instead of stdout
+   - Prevents log messages from corrupting JSON-RPC communication
+
+3. **Fixed MCP Notification Handling** (`server/src/mcp_server.rs:59-74`):
+   - Server now detects notifications (messages without `id` field)
+   - Properly skips sending responses to notifications per MCP specification
+
+### Benefits of MCP Implementation
+
+- **Standardized Protocol**: Well-defined specification for tool exposure
+- **Type Safety**: JSON Schema validation for tool parameters
+- **Tool Discovery**: Automatic enumeration of available tools and their schemas
+- **Debugging Support**: Built-in logging and error handling
+- **Ecosystem Compatibility**: Can integrate with other MCP-compatible clients
+- **Future Extensibility**: Easy to add new tools following MCP patterns
 
 ## Troubleshooting
 
-1. **"Connection refused"**: Make sure Anvil is running on `127.0.0.1:8545`
-2. **"Invalid API key"**: Check your `ANTHROPIC_API_KEY` environment variable
-3. **Build errors**: Ensure Rust 1.70+ is installed
+### Common Issues
+
+1. **"No such file or directory (os error 2)"**:
+   - **Cause**: Client can't find the MCP server executable
+   - **Solution**: Run client from workspace root directory: `cd /path/to/agent-eth && cargo run --bin agent-eth-client`
+   - **Check**: Verify server exists at `./target/debug/agent-eth-server`
+
+2. **"Connection refused"**: 
+   - **Cause**: Anvil is not running or not accessible
+   - **Solution**: Start Anvil in separate terminal: `anvil --fork-url https://eth-mainnet.g.alchemy.com/v2/4UjEl1ULr2lQYsGR5n7gGKd3pzgAzxKs`
+   - **Check**: Anvil should be listening on `127.0.0.1:8545`
+
+3. **"Invalid API key"**: 
+   - **Cause**: Missing or incorrect Anthropic API key
+   - **Solution**: Set environment variable: `export ANTHROPIC_API_KEY="your-api-key-here"`
+   - **Check**: Verify key is set: `echo $ANTHROPIC_API_KEY`
+
+4. **"Balance: No response content"**:
+   - **Cause**: MCP communication issue between client and server
+   - **Solution**: This should be resolved in latest version. Enable debug logging: `RUST_LOG=debug cargo run --bin agent-eth-client`
+   - **Check**: Look for "MCP Response" debug messages
+
+5. **Build errors**: 
+   - **Cause**: Incompatible Rust version or missing dependencies
+   - **Solution**: Ensure Rust 1.70+ is installed: `rustup update`
 
 ## Future Enhancements
 
