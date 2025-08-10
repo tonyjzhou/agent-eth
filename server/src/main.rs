@@ -4,6 +4,7 @@ mod mcp_server;
 mod provider;
 mod tools;
 
+use rmcp::{transport::stdio, ServiceExt};
 use tracing::info;
 
 #[tokio::main]
@@ -12,10 +13,13 @@ async fn main() -> anyhow::Result<()> {
         .with_writer(std::io::stderr)
         .init();
 
-    info!("Starting MCP server...");
+    info!("Starting RMCP server...");
 
-    let server = mcp_server::EthereumMcpServer::new()?;
-    server.run().await?;
+    let tool_router = mcp_server::EthereumToolRouter::new()?;
+
+    // Serve using RMCP SDK with stdio transport
+    let server = tool_router.serve(stdio()).await?;
+    server.waiting().await?;
 
     Ok(())
 }

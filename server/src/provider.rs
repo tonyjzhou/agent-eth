@@ -7,6 +7,7 @@ use std::str::FromStr;
 
 // ENS support removed for simplicity - would require complex mainnet contract interactions
 
+#[derive(Clone)]
 pub struct EthereumProvider {
     rpc_url: String,
 }
