@@ -1,21 +1,21 @@
 # Agent-ETH: AI Agent for Ethereum Blockchain
 
-An AI-powered agent system that allows users to interact with Ethereum blockchain using natural language commands. Features a CLI client with Anthropic Claude integration and an MCP server exposing Ethereum tools.
+An AI-powered agent system that allows users to interact with Ethereum blockchain using natural language commands. Features a CLI client with Anthropic Claude integration and an RMCP server exposing Ethereum tools.
 
 ## Architecture
 
 ```
-             ┌─────────────────┐   MCP over stdio   ┌──────────────────┐
-             │   CLI Client    │◄──────────────────►│   MCP Server     │
+             ┌─────────────────┐  RMCP over stdio   ┌──────────────────┐
+             │   CLI Client    │◄──────────────────►│   RMCP Server    │
              │                 │                    │                  │
              ├─────────────────┤                    ├──────────────────┤
 User   ◄───► │ • Interactive   │                    │ • Balance Tool   │
 Claude ◄───► │   REPL          │                    │ • Transfer Tool  │
              │ • Claude API    │                    │ • Contract Tool  │
              │ • RAG System    │                    │ • Swap Tool      │
-             │ • Account       │                    │ • Alloy Provider │
+             │ • Account       │                    │ • Alloy v1.0     │
              │   Aliases       │                    │ • External APIs  │
-             │ • MCP Client    │                    │ • JSON-RPC 2.0   │
+             │ • RMCP Client   │                    │ • RMCP v0.5.0    │
              └─────────────────┘                    └──────────────────┘
                       │                                       │
                       │                                       │
@@ -67,7 +67,7 @@ Claude ◄───► │   REPL          │                    │ • Transf
    ```
 
 2. The build will create two binaries:
-   - `./target/release/agent-eth-server` (MCP Server)
+   - `./target/release/agent-eth-server` (RMCP Server)
    - `./target/release/agent-eth-client` (CLI Client)
 
 ## Usage
@@ -82,7 +82,7 @@ Claude ◄───► │   REPL          │                    │ • Transf
    ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client
    ```
 
-   **Note**: The client automatically spawns the MCP server as a subprocess, so no separate server process is needed.
+   **Note**: The client automatically spawns the RMCP server as a subprocess, so no separate server process is needed.
 
 3. **Example Commands**:
    ```
@@ -91,6 +91,7 @@ Claude ◄───► │   REPL          │                    │ • Transf
    eth> Is Uniswap V2 Router deployed at 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D?
    eth> What's Bob's balance?
    eth> Transfer 0.5 ETH from Carol to Alice
+   eth> Use Uniswap V2 Router to swap 10 ETH for USDC on Alice's account
    ```
 
 ## Test Accounts
@@ -120,6 +121,11 @@ Each account starts with 10,000 ETH on the local fork.
 ### Contract Verification
 - `"Is Uniswap V2 Router deployed at 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D?"`
 - `"Check if there's a contract at 0x1234..."`
+
+### Token Swaps
+- `"Use Uniswap V2 Router to swap 10 ETH for USDC on Alice's account"`
+- `"Swap 1000 USDC for WETH from Bob's account"`
+- `"Swap 500 USDC for ETH using Alice's account"`
 
 ### Documentation Commands
 - `ingest <directory_path>` - Ingest documentation from a directory for RAG search
@@ -198,14 +204,14 @@ agent-eth/
    - Interactive REPL using rustyline with colored output
    - Direct Anthropic Claude API integration for natural language parsing
    - Account alias resolution (Alice, Bob, Carol → hex addresses)
-   - MCP client for communicating with server via JSON-RPC 2.0 over stdio
-   - RAG system for documentation search with vector embeddings
+   - RMCP client for communicating with server via stdio transport
+   - RAG system for documentation search with vector embeddings using SQLite
 
-2. **MCP Server**:
-   - Model Context Protocol compliant server exposing Ethereum tools
-   - Uses alloy for Ethereum blockchain interactions (migrated from ethers-rs)
+2. **RMCP Server**:
+   - RMCP (Rust Model Context Protocol) v0.5.0 compliant server exposing Ethereum tools
+   - Uses Alloy v1.0 for Ethereum blockchain interactions (migrated from deprecated ethers-rs)
    - Four main tools: `get_balance`, `send_transfer`, `check_contract`, `execute_swap`
-   - External API integration for contract discovery and token pricing
+   - External API integration (Brave Search, DefiLlama) for contract discovery and token pricing
    - Connects to local Anvil fork on http://127.0.0.1:8545
 
 3. **RAG System**:
@@ -215,10 +221,10 @@ agent-eth/
    - Natural language querying of technical documentation
 
 4. **Communication**:
-   - Client and server communicate via Model Context Protocol (MCP) using JSON-RPC 2.0 over stdio transport
+   - Client and server communicate via RMCP (Rust Model Context Protocol) using stdio transport
    - Server runs as subprocess spawned by client
    - Async/await throughout for non-blocking operations
-   - Error handling with MCP-compliant JSON-RPC error responses
+   - Error handling with RMCP-compliant error responses using McpError types
 
 ### Security Notes
 
@@ -226,41 +232,31 @@ agent-eth/
 - Never use these private keys on mainnet
 - The system is designed for local development and testing
 
-## Model Context Protocol (MCP) Implementation
+## RMCP (Rust Model Context Protocol) Implementation
 
-Agent-ETH implements the Model Context Protocol (MCP) for client-server communication, providing a standardized way to expose Ethereum tools to AI agents.
+Agent-ETH implements RMCP v0.5.0 for client-server communication, providing a standardized way to expose Ethereum tools to AI agents.
 
-### MCP Architecture
+### RMCP Architecture
 
 **Client-Server Communication:**
-- **Protocol**: JSON-RPC 2.0 over stdio transport
+- **Protocol**: RMCP over stdio transport
 - **Process Model**: Client spawns server as subprocess 
-- **Message Flow**: Request/response with optional notifications
-- **Error Handling**: MCP-compliant error codes and messages
+- **Message Flow**: Request/response with async futures
+- **Error Handling**: RMCP-compliant error codes and messages using McpError
 
 **Tool Discovery:**
-```json
-{
-  "jsonrpc": "2.0", 
-  "method": "tools/list",
-  "result": {
-    "tools": [
-      {
-        "name": "get_balance",
-        "description": "Get the balance of an Ethereum address for ETH or ERC20 tokens",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "address": {"type": "string", "description": "The Ethereum address to check"},
-            "token": {"type": "string", "description": "Token symbol (ETH or ERC20)", "default": "ETH"}
-          },
-          "required": ["address"]
-        }
-      }
-    ]
-  }
+Tools are automatically registered using RMCP macros:
+```rust
+#[tool(description = "Get the balance of an Ethereum address for ETH or ERC20 tokens")]
+async fn get_balance(
+    &self,
+    Parameters(params): Parameters<serde_json::Value>,
+) -> Result<CallToolResult, McpError> {
+    // Implementation
 }
 ```
+
+The `#[tool]` macro automatically generates the tool schema and registration.
 
 ### Implementation Details
 
@@ -279,35 +275,38 @@ Agent-ETH implements the Model Context Protocol (MCP) for client-server communic
 - Client includes detailed JSON parsing error messages
 - Graceful fallback for unexpected response formats
 
-### Recent Bug Fixes
+### Recent Major Updates
 
-1. **Fixed Server Path Issue** (`client/src/main.rs:17`):
-   - Changed from `../target/debug/agent-eth-server` to `./target/debug/agent-eth-server`
-   - Ensures client can find server when run from workspace root
+1. **RMCP Migration** (`server/src/mcp_server.rs`, `server/Cargo.toml`):
+   - Migrated from basic HTTP communication to RMCP v0.5.0
+   - Added `#[tool_router]` and `#[tool]` macros for automatic tool registration
+   - Provides standardized MCP-compliant tool exposure with schema generation
 
-2. **Fixed Logging Interference** (`server/src/main.rs:11-13`):
-   - Configured tracing to write to stderr instead of stdout
-   - Prevents log messages from corrupting JSON-RPC communication
+2. **Alloy v1.0 Integration** (`server/src/provider.rs`, `server/Cargo.toml`):
+   - Migrated from deprecated ethers-rs to modern Alloy v1.0
+   - Added real transaction execution with wallet integration
+   - Improved performance and maintainability
 
-3. **Fixed MCP Notification Handling** (`server/src/mcp_server.rs:59-74`):
-   - Server now detects notifications (messages without `id` field)
-   - Properly skips sending responses to notifications per MCP specification
+3. **Enhanced Logging** (`server/src/main.rs:11-14`):
+   - Configured tracing to write to stderr to avoid stdio transport interference
+   - Clean RMCP communication without log message corruption
 
-### Benefits of MCP Implementation
+### Benefits of RMCP Implementation
 
 - **Standardized Protocol**: Well-defined specification for tool exposure
-- **Type Safety**: JSON Schema validation for tool parameters
+- **Macro-based Registration**: `#[tool]` and `#[tool_router]` macros for automatic schema generation
+- **Type Safety**: Built-in parameter validation and error handling
 - **Tool Discovery**: Automatic enumeration of available tools and their schemas
-- **Debugging Support**: Built-in logging and error handling
-- **Ecosystem Compatibility**: Can integrate with other MCP-compatible clients
-- **Future Extensibility**: Easy to add new tools following MCP patterns
+- **Rust-native**: Native Rust implementation with async/await support
+- **Debugging Support**: Built-in logging and error handling with McpError types
+- **Future Extensibility**: Easy to add new tools using RMCP patterns
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **"No such file or directory (os error 2)"**:
-   - **Cause**: Client can't find the MCP server executable
+   - **Cause**: Client can't find the RMCP server executable
    - **Solution**: Run client from workspace root directory: `cd /path/to/agent-eth && cargo run --bin agent-eth-client`
    - **Check**: Verify server exists at `./target/debug/agent-eth-server`
 
@@ -321,10 +320,10 @@ Agent-ETH implements the Model Context Protocol (MCP) for client-server communic
    - **Solution**: Set environment variable: `export ANTHROPIC_API_KEY="your-api-key-here"`
    - **Check**: Verify key is set: `echo $ANTHROPIC_API_KEY`
 
-4. **"Balance: No response content"**:
-   - **Cause**: MCP communication issue between client and server
-   - **Solution**: This should be resolved in latest version. Enable debug logging: `RUST_LOG=debug cargo run --bin agent-eth-client`
-   - **Check**: Look for "MCP Response" debug messages
+4. **RMCP Communication Issues**:
+   - **Cause**: RMCP communication problem between client and server
+   - **Solution**: Enable debug logging: `RUST_LOG=debug cargo run --bin agent-eth-client`
+   - **Check**: Look for RMCP request/response debug messages in server logs
 
 5. **Build errors**: 
    - **Cause**: Incompatible Rust version or missing dependencies
@@ -332,8 +331,9 @@ Agent-ETH implements the Model Context Protocol (MCP) for client-server communic
 
 ## Future Enhancements
 
-- Token balance queries (ERC-20)
-- Multi-chain support
-- Advanced DeFi integrations (Uniswap V3, V4)
-- Real-time price feeds and analytics
-- Transaction simulation and analysis
+- Enhanced ERC-20 token support with automatic contract discovery
+- Multi-chain support (Polygon, Arbitrum, Base)
+- Advanced DeFi integrations (Uniswap V3, V4, Aave, Compound)
+- Real-time price feeds and portfolio analytics
+- Transaction simulation and MEV analysis
+- Advanced RAG system with more documentation sources
