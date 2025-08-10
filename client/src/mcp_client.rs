@@ -64,6 +64,8 @@ impl McpClient {
     async fn send_request(&mut self, request: Value) -> Result<Value> {
         let request_str = format!("{}\n", serde_json::to_string(&request)?);
 
+        tracing::debug!("Sending MCP request: {}", request_str.trim());
+
         if let Some(stdin) = self.process.stdin.as_mut() {
             stdin.write_all(request_str.as_bytes()).await?;
             stdin.flush().await?;
@@ -77,8 +79,16 @@ impl McpClient {
             let mut line = String::new();
             reader.read_line(&mut line).await?;
 
+            tracing::debug!("Raw server response: {:?}", line);
+
             if !line.is_empty() {
-                let response: Value = serde_json::from_str(&line)?;
+                let response: Value = serde_json::from_str(line.trim()).map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to parse server response as JSON: {}. Response was: '{}'",
+                        e,
+                        line.trim()
+                    )
+                })?;
                 Ok(response)
             } else {
                 Err(anyhow::anyhow!("Empty response from server"))
@@ -90,6 +100,8 @@ impl McpClient {
 
     async fn send_notification(&mut self, notification: Value) -> Result<()> {
         let notification_str = format!("{}\n", serde_json::to_string(&notification)?);
+
+        tracing::debug!("Sending MCP notification: {}", notification_str.trim());
 
         if let Some(stdin) = self.process.stdin.as_mut() {
             stdin.write_all(notification_str.as_bytes()).await?;
@@ -113,6 +125,12 @@ impl McpClient {
         let response = self.send_request(request).await?;
         self.request_id += 1;
 
+        // Debug: Print the full response for troubleshooting
+        tracing::debug!(
+            "MCP Response: {}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
+
         // Extract the result from the response
         if let Some(result) = response.get("result") {
             if let Some(content) = result.get("content") {
@@ -135,6 +153,11 @@ impl McpClient {
             return Err(anyhow::anyhow!("MCP error: {}", error_msg));
         }
 
+        // Debug: Show what we received instead
+        tracing::debug!(
+            "Unexpected response format: {}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
         Ok("No response content".to_string())
     }
 

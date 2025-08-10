@@ -14,7 +14,7 @@ use std::env;
 #[command(name = "agent-eth-client")]
 #[command(about = "An AI agent for interacting with Ethereum blockchain")]
 struct Cli {
-    #[arg(long, default_value = "../target/debug/agent-eth-server")]
+    #[arg(long, default_value = "./target/debug/agent-eth-server")]
     server_command: String,
 }
 
