@@ -73,7 +73,8 @@ Built an AI agent system for Ethereum blockchain interaction using natural langu
 ### ✅ 13. Implement token swap functionality via Uniswap V2
 - Full Uniswap V2 Router integration with ETH→Token, Token→ETH, Token→Token swaps
 - Automatic token approval handling and slippage protection
-- External API integration (Brave Search, DefiLlama) for contract discovery and pricing
+- External API integration (Brave Search, CoinGecko) for contract discovery
+- On-chain pricing via Uniswap V2 Router's `getAmountsOut` for accurate real-time pricing
 - Real transaction execution with detailed confirmations
 
 ### ✅ 14. Add comprehensive RAG (Retrieval-Augmented Generation) system
@@ -168,8 +169,9 @@ The system is production-ready for development/testing environments and provides
 
 **External Integrations:**
 - ✅ **Anthropic Claude API**: Direct integration with natural language parsing and command resolution
-- ✅ **Brave Search API**: Contract address discovery for token swaps
-- ✅ **DefiLlama API**: Real-time token pricing for swap calculations
+- ✅ **Brave Search API**: Contract address discovery for token swaps via web search
+- ✅ **CoinGecko API**: Protocol address resolution with fallback to hardcoded addresses
+- ✅ **Uniswap V2 Router Contract**: On-chain pricing via `getAmountsOut` for accurate swap calculations
 - ✅ **OpenAI Embeddings**: Enhanced RAG system with vector similarity search
 
 **User Experience:**

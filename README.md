@@ -194,6 +194,8 @@ agent-eth/
 
 - `ANTHROPIC_API_KEY` - Required. Your Anthropic API key
 - `RPC_URL` - Optional. Ethereum RPC URL (defaults to `http://127.0.0.1:8545`)
+- `BRAVE_API_KEY` - Optional. Brave Search API key for contract address discovery
+- `COINGECKO_API_KEY` - Optional. CoinGecko API key for protocol address resolution
 - `OPENAI_API_KEY` - Optional. OpenAI API key for enhanced embeddings (falls back to basic embeddings)
 
 ## Technical Details
@@ -211,7 +213,8 @@ agent-eth/
    - RMCP (Rust Model Context Protocol) v0.5.0 compliant server exposing Ethereum tools
    - Uses Alloy v1.0 for Ethereum blockchain interactions (migrated from deprecated ethers-rs)
    - Four main tools: `get_balance`, `send_transfer`, `check_contract`, `execute_swap`
-   - External API integration (Brave Search, DefiLlama) for contract discovery and token pricing
+   - External API integration (Brave Search, CoinGecko) for contract discovery
+   - On-chain pricing via Uniswap V2 Router's `getAmountsOut` for accurate token pricing
    - Connects to local Anvil fork on http://127.0.0.1:8545
 
 3. **RAG System**:
@@ -225,6 +228,25 @@ agent-eth/
    - Server runs as subprocess spawned by client
    - Async/await throughout for non-blocking operations
    - Error handling with RMCP-compliant error responses using McpError types
+
+### External API Integration
+
+**Contract Discovery:**
+- **Brave Search API**: Searches for Ethereum contract addresses by token name using web search
+  - Endpoint: `https://api.search.brave.com/res/v1/web/search`
+  - Extracts addresses using regex pattern matching from search results
+  - Fallback to hardcoded addresses for common tokens (USDC, WETH, Uniswap Router)
+
+- **CoinGecko API**: Protocol address resolution for DeFi protocols
+  - Endpoint: `https://api.coingecko.com/api/v3/exchanges/uniswap_v2`
+  - Currently falls back to hardcoded addresses but framework is in place
+  - Supports free tier with rate limits or Pro tier with API key
+
+**Token Pricing:**
+- **Uniswap V2 Router On-Chain Calls**: Real-time, accurate pricing using `getAmountsOut`
+  - Calls Uniswap V2 Router contract directly for swap price calculations
+  - More accurate than external price APIs as it uses actual AMM pool ratios
+  - Supports ETH↔Token and Token↔Token pricing through WETH intermediary
 
 ### Security Notes
 
