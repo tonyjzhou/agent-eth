@@ -14,9 +14,6 @@ tracing-subscriber = { workspace = true }
 # Ethereum interaction (migrated from deprecated ethers-rs to Alloy)
 alloy = { version = "1.0", features = ["full"] }
 
-# HTTP server for MCP
-axum = "0.7"
-tower = "0.4"
 
 # Async utilities
 futures = "0.3"

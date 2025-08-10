@@ -14,8 +14,8 @@ use std::env;
 #[command(name = "agent-eth-client")]
 #[command(about = "An AI agent for interacting with Ethereum blockchain")]
 struct Cli {
-    #[arg(long, default_value = "http://127.0.0.1:3000")]
-    server_url: String,
+    #[arg(long, default_value = "../target/debug/agent-eth-server")]
+    server_command: String,
 }
 
 #[tokio::main]
@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
 
     // Initialize components
     let mut agent = EthereumAgent::new(&anthropic_api_key)?;
-    let mcp_client = McpClient::new(&args.server_url);
+    let mut mcp_client = McpClient::new(&args.server_command, vec![]).await?;
 
     // Initialize RAG system
     let rag_db_path = "client_rag.db";
@@ -120,7 +120,7 @@ async fn main() -> Result<()> {
                             token: None,
                         };
 
-                        if let Err(e) = handle_test_swap(&mcp_client, test_command).await {
+                        if let Err(e) = handle_test_swap(&mut mcp_client, test_command).await {
                             println!("{} {}", "❌ Test Error:".bright_red().bold(), e);
                         }
                         continue;
@@ -178,7 +178,7 @@ async fn main() -> Result<()> {
                             }
                         }
 
-                        if let Err(e) = handle_command(&agent, &mcp_client, input).await {
+                        if let Err(e) = handle_command(&agent, &mut mcp_client, input).await {
                             println!("{} {}", "❌ Error:".bright_red().bold(), e);
                         }
                     }
@@ -202,7 +202,11 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn handle_command(agent: &EthereumAgent, mcp_client: &McpClient, input: &str) -> Result<()> {
+async fn handle_command(
+    agent: &EthereumAgent,
+    mcp_client: &mut McpClient,
+    input: &str,
+) -> Result<()> {
     println!("{} {}", "🤖 Processing:".bright_blue(), input.italic());
 
     let parsed = agent.parse_command(input).await?;
@@ -326,7 +330,7 @@ async fn handle_command(agent: &EthereumAgent, mcp_client: &McpClient, input: &s
     Ok(())
 }
 
-async fn handle_test_swap(mcp_client: &McpClient, parsed: agent::ParsedCommand) -> Result<()> {
+async fn handle_test_swap(mcp_client: &mut McpClient, parsed: agent::ParsedCommand) -> Result<()> {
     println!("🔍 Debug: Test parsed action = '{}'", parsed.action);
 
     if let (Some(from), Some(token_in), Some(token_out), Some(amount_in)) = (
