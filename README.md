@@ -32,6 +32,8 @@ Claude ◄───► │ • LLM API Key   │                    │ • Tx G
 - **Balance Queries**: Check ETH balances for any address
 - **ETH Transfers**: Send ETH between accounts with automatic transaction handling
 - **Contract Verification**: Check if contracts are deployed at specific addresses
+- **Token Swaps**: Swap tokens using Uniswap V2 Router with slippage protection
+- **RAG Documentation Search**: Query ingested documentation using natural language
 - **CLI REPL Interface**: Interactive command-line interface with colored output
 
 ## Prerequisites
@@ -114,6 +116,11 @@ Each account starts with 10,000 ETH on the local fork.
 - `"Is Uniswap V2 Router deployed at 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D?"`
 - `"Check if there's a contract at 0x1234..."`
 
+### Documentation Commands
+- `ingest <directory_path>` - Ingest documentation from a directory for RAG search
+- `clear` or `clear docs` - Clear all ingested documents from RAG system
+- `"How do I create a pool in Uniswap V3?"` - Ask questions about ingested documentation
+
 ### System Commands
 - `help` - Show available commands
 - `exit` or `quit` - Exit the program
@@ -127,10 +134,16 @@ agent-eth/
 ├── Cargo.toml              # Workspace configuration
 ├── client/                 # RIG Agent Client
 │   ├── Cargo.toml
+│   ├── docs/               # Uniswap documentation for RAG
 │   └── src/
 │       ├── main.rs         # CLI REPL interface
 │       ├── agent.rs        # RIG agent implementation
-│       └── mcp_client.rs   # MCP client
+│       ├── mcp_client.rs   # MCP client
+│       └── rag/            # RAG system implementation
+│           ├── mod.rs      # RAG system core
+│           ├── embeddings.rs # Embedding service
+│           ├── ingestion.rs  # Document ingestion
+│           └── storage.rs  # Vector storage
 ├── server/                 # MCP Server
 │   ├── Cargo.toml
 │   └── src/
@@ -139,7 +152,8 @@ agent-eth/
 │       └── tools/          # MCP tools
 │           ├── balance.rs
 │           ├── transfer.rs
-│           └── contract_check.rs
+│           ├── contract_check.rs
+│           └── swap.rs
 └── README.md
 ```
 
@@ -160,6 +174,7 @@ agent-eth/
 
 - `ANTHROPIC_API_KEY` - Required. Your Anthropic API key
 - `RPC_URL` - Optional. Ethereum RPC URL (defaults to `http://127.0.0.1:8545`)
+- `OPENAI_API_KEY` - Optional. OpenAI API key for enhanced embeddings (falls back to basic embeddings)
 
 ## Technical Details
 
@@ -170,16 +185,23 @@ agent-eth/
    - Integrates with Anthropic Claude API
    - Parses natural language into structured commands
    - Handles account aliases and address resolution
+   - RAG system for documentation search with vector embeddings
 
 2. **MCP Server**:
    - Implements Model Context Protocol for tool exposure
-   - Uses ethers-rs for Ethereum interactions
-   - Provides tools for balance, transfer, and contract checking
+   - Uses alloy for Ethereum interactions (migrated from ethers-rs)
+   - Provides tools for balance, transfer, contract checking, and token swaps
+   - External API integration for contract discovery and token pricing
    - Connects to local Anvil fork
 
-3. **Communication**:
-   - Client and server communicate via MCP over stdio
-   - JSON-RPC protocol for tool calls
+3. **RAG System**:
+   - Vector database for document storage and similarity search
+   - OpenAI embeddings API for enhanced text understanding
+   - Document ingestion from markdown files
+   - Natural language querying of technical documentation
+
+4. **Communication**:
+   - Client and server communicate via JSON over HTTP (simplified from MCP)
    - Async/await throughout for non-blocking operations
 
 ### Security Notes
@@ -197,7 +219,7 @@ agent-eth/
 ## Future Enhancements
 
 - Token balance queries (ERC-20)
-- Uniswap swap integration
 - Multi-chain support
-- RAG system for documentation queries
-- Web search integration for contract addresses
+- Advanced DeFi integrations (Uniswap V3, V4)
+- Real-time price feeds and analytics
+- Transaction simulation and analysis

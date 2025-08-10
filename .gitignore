@@ -24,6 +24,10 @@ Cargo.lock
 ehthumbs.db
 Thumbs.db
 
+# Claude configuration (local only)
+CLAUDE.md
+.claude/
+
 # Rust-analyzer
 rust-project.json
 
@@ -35,16 +39,6 @@ rust-project.json
 # Log files
 *.log
 logs/
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-Icon?
-ehthumbs.db
-Thumbs.db
 
 # Backup files
 *.bak
@@ -174,6 +168,10 @@ private/
 wallet.json
 keystore/
 
+# RAG system database files
+*.db
+client_rag.db
+
 # Documentation build
 book/
 docs/_build/
@@ -187,6 +185,3 @@ htmlcov/
 # Flamegraph outputs
 flamegraph.svg
 perf.data*
-
-
-CLAUDE.md
