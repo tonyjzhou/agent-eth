@@ -2,7 +2,7 @@ mod agent;
 mod mcp_client;
 mod rag;
 
-use agent::EthereumAgent;
+use agent::{AgentCore, EthereumAgent};
 use anyhow::Result;
 use clap::Parser;
 use colored::*;
@@ -32,23 +32,41 @@ async fn main() -> Result<()> {
         "🚀 Starting Ethereum AI Agent...".bright_blue().bold()
     );
 
-    // Initialize components
+    // Initialize components - both old and new systems for compatibility
     let mut agent = EthereumAgent::new(&anthropic_api_key)?;
+    let mut agent_core = AgentCore::new(&anthropic_api_key)?;
     let mut mcp_client = McpClient::new(&args.server_command, vec![]).await?;
 
-    // Initialize RAG system
+    // Initialize RAG system for both agents
     let rag_db_path = "client_rag.db";
+    let mut rag_initialized = false;
     if let Err(e) = agent.initialize_rag(rag_db_path).await {
         println!(
-            "{} Failed to initialize RAG system: {}",
+            "{} Failed to initialize RAG system for legacy agent: {}",
             "⚠️".bright_yellow(),
             e
         );
-        println!(
-            "{}",
-            "Continuing without documentation search...".bright_yellow()
-        );
     } else {
+        rag_initialized = true;
+    }
+
+    if let Err(e) = agent_core.initialize_rag(rag_db_path).await {
+        println!(
+            "{} Failed to initialize RAG system for intelligent agent: {}",
+            "⚠️".bright_yellow(),
+            e
+        );
+        if !rag_initialized {
+            println!(
+                "{}",
+                "Continuing without documentation search...".bright_yellow()
+            );
+        }
+    } else if !rag_initialized {
+        rag_initialized = true;
+    }
+
+    if rag_initialized {
         println!("{}", "✅ RAG system initialized".bright_green());
     }
 
@@ -164,6 +182,27 @@ async fn main() -> Result<()> {
                             continue;
                         }
 
+                        // Check for intelligent agent requests (complex operations)
+                        if is_complex_operation(input) {
+                            if let Err(e) =
+                                handle_intelligent_command(&mut agent_core, &mut mcp_client, input)
+                                    .await
+                            {
+                                println!("{} {}", "❌ Agent Error:".bright_red().bold(), e);
+                                // Fallback to simple parsing on agent error
+                                println!(
+                                    "{}",
+                                    "🔄 Falling back to simple command parsing...".bright_yellow()
+                                );
+                                if let Err(e2) =
+                                    handle_command(&agent, &mut mcp_client, input).await
+                                {
+                                    println!("{} {}", "❌ Fallback Error:".bright_red().bold(), e2);
+                                }
+                            }
+                            continue;
+                        }
+
                         // Check if this might be a documentation query
                         if agent.is_documentation_query(input).await {
                             println!(
@@ -172,12 +211,13 @@ async fn main() -> Result<()> {
                                 input.italic()
                             );
 
-                            if let Ok(answer) = agent.answer_documentation_query(input).await {
+                            if let Ok(answer) = agent_core.answer_documentation_query(input).await {
                                 println!("{} {}", "📖".bright_blue(), answer);
                                 continue;
                             }
                         }
 
+                        // Default to legacy command handling for simple operations
                         if let Err(e) = handle_command(&agent, &mut mcp_client, input).await {
                             println!("{} {}", "❌ Error:".bright_red().bold(), e);
                         }
@@ -372,6 +412,134 @@ async fn handle_test_swap(mcp_client: &mut McpClient, parsed: agent::ParsedComma
     Ok(())
 }
 
+// Helper function to determine if an operation is complex enough for the intelligent agent
+fn is_complex_operation(input: &str) -> bool {
+    let input_lower = input.to_lowercase();
+
+    // Multi-step operation indicators
+    let multi_step_patterns = [
+        "if",
+        "then",
+        "after",
+        "before",
+        "once",
+        "when",
+        "check if",
+        "and then",
+        "but only if",
+        "depending on",
+        "compare",
+        "optimal",
+        "best",
+        "cheapest",
+        "most efficient",
+    ];
+
+    // Complex operation types
+    let complex_patterns = [
+        "find the best",
+        "compare prices",
+        "what's the cheapest",
+        "find contract address for",
+        "lookup",
+        "search for address",
+        "check both",
+        "check all",
+        "multiple",
+        "several",
+        "various",
+        "plan",
+        "strategy",
+        "optimize",
+        "analysis",
+        "analyze",
+    ];
+
+    // Conditional operations
+    let conditional_patterns = [
+        "if alice has more than",
+        "if balance is",
+        "if there's enough",
+        "only if",
+        "provided that",
+        "assuming",
+        "check first",
+    ];
+
+    multi_step_patterns
+        .iter()
+        .any(|&pattern| input_lower.contains(pattern))
+        || complex_patterns
+            .iter()
+            .any(|&pattern| input_lower.contains(pattern))
+        || conditional_patterns
+            .iter()
+            .any(|&pattern| input_lower.contains(pattern))
+}
+
+async fn handle_intelligent_command(
+    agent_core: &mut AgentCore,
+    mcp_client: &mut McpClient,
+    input: &str,
+) -> Result<()> {
+    println!(
+        "{} {}",
+        "🤖 AI Agent analyzing:".bright_blue(),
+        input.italic()
+    );
+
+    // Plan the execution
+    let plan = agent_core.plan_execution(input).await?;
+
+    // Show the plan to user
+    println!("{}", "📋 Execution Plan:".bright_green().bold());
+    println!("💭 {}", plan.reasoning.bright_white());
+    println!();
+
+    for (i, step) in plan.steps.iter().enumerate() {
+        println!(
+            "{}. {} ({})",
+            (i + 1).to_string().bright_cyan(),
+            step.description.bright_white(),
+            step.tool_name.bright_black()
+        );
+    }
+    println!();
+
+    // Ask for confirmation if needed
+    if plan.requires_confirmation {
+        println!(
+            "{}",
+            "⚠️ This operation requires confirmation."
+                .bright_yellow()
+                .bold()
+        );
+        print!("Continue? (y/N): ");
+        use std::io::{self, Write};
+        io::stdout().flush()?;
+
+        let mut response = String::new();
+        io::stdin().read_line(&mut response)?;
+
+        if !response.trim().to_lowercase().starts_with('y') {
+            println!("{}", "❌ Operation cancelled".bright_red());
+            return Ok(());
+        }
+    }
+
+    // Execute the plan
+    println!("{}", "⚡ Executing plan...".bright_blue().bold());
+    let results = agent_core.execute_plan(plan, mcp_client).await?;
+
+    // Show results
+    println!("{}", "🎉 Results:".bright_green().bold());
+    for result in results {
+        println!("  {result}");
+    }
+
+    Ok(())
+}
+
 fn print_help() {
     println!("{}", "📖 Available Commands:".bright_blue().bold());
     println!();
@@ -406,6 +574,24 @@ fn print_help() {
         "  {} - Manual test swap (bypasses Claude API)",
         "test swap".bright_cyan()
     );
+    println!();
+    println!(
+        "  {}:",
+        "🧠 Intelligent Agent Examples".bright_magenta().bold()
+    );
+    println!(
+        "    • {}",
+        "Check Alice's balance, and if she has more than 5 ETH, swap 2 ETH for USDC".italic()
+    );
+    println!(
+        "    • {}",
+        "Find the best swap rate between USDC and WETH".italic()
+    );
+    println!(
+        "    • {}",
+        "Compare token balances across all accounts".italic()
+    );
+    println!("    • {}", "Plan an optimal arbitrage strategy".italic());
     println!();
     println!("  {}:", "Available accounts".bright_yellow().bold());
     println!("    • Alice: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");

@@ -1,6 +1,6 @@
 # Agent-ETH: AI Agent for Ethereum Blockchain
 
-An AI-powered agent system that allows users to interact with Ethereum blockchain using natural language commands. Features a CLI client with Anthropic Claude integration and an RMCP server exposing Ethereum tools.
+An **intelligent AI agent system** that enables sophisticated Ethereum blockchain interactions using natural language. Features an advanced AI planning system, multi-step execution engine, and dynamic tool selection for complex blockchain operations.
 
 ## Architecture
 
@@ -30,14 +30,22 @@ Claude ◄───► │   REPL          │                    │ • Transf
 
 ## Features
 
-- **Natural Language Processing**: Interact with Ethereum using plain English
+### 🧠 **Intelligent Agent System**
+- **AI Planning & Reasoning**: Claude-powered agent that creates execution plans for complex requests
+- **Multi-step Operations**: Support for conditional logic and workflow orchestration
+- **Dynamic Tool Selection**: Intelligent selection of blockchain tools based on context
+- **Session Memory**: Remembers previous operations and maintains execution context
+- **Confirmation System**: Smart risk assessment with user confirmation for dangerous operations
+
+### 🔧 **Core Blockchain Capabilities**
+- **Natural Language Processing**: Interact with Ethereum using plain English or complex commands
 - **Account Aliases**: Use friendly names (Alice, Bob, Carol) instead of hex addresses
-- **Balance Queries**: Check ETH balances for any address
+- **Balance Queries**: Check ETH and ERC-20 token balances for any address
 - **ETH Transfers**: Send ETH between accounts with automatic transaction handling
 - **Contract Verification**: Check if contracts are deployed at specific addresses
-- **Token Swaps**: Swap tokens using Uniswap V2 Router with slippage protection
+- **Token Swaps**: Execute swaps using Uniswap V2 Router with slippage protection
 - **RAG Documentation Search**: Query ingested documentation using natural language
-- **CLI REPL Interface**: Interactive command-line interface with colored output
+- **CLI REPL Interface**: Interactive command-line interface with colored output and intelligent agent feedback
 
 ## Prerequisites
 
@@ -85,13 +93,22 @@ Claude ◄───► │   REPL          │                    │ • Transf
    **Note**: The client automatically spawns the RMCP server as a subprocess, so no separate server process is needed.
 
 3. **Example Commands**:
+   
+   **Simple Operations** (legacy compatibility):
    ```
    eth> send 1 ETH from Alice to Bob
    eth> How much ETH does Alice have?
-   eth> Is Uniswap V2 Router deployed at 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D?
    eth> What's Bob's balance?
-   eth> Transfer 0.5 ETH from Carol to Alice
    eth> Use Uniswap V2 Router to swap 10 ETH for USDC on Alice's account
+   ```
+   
+   **🧠 Intelligent Agent Operations** (automatically detected):
+   ```
+   eth> Check Alice's balance, and if she has more than 5 ETH, swap 2 ETH for USDC
+   eth> Find the best swap rate between USDC and WETH
+   eth> Compare token balances across all accounts
+   eth> Plan an optimal arbitrage strategy
+   eth> If Bob has enough ETH, transfer 1 ETH to Carol, then swap 500 USDC for WETH
    ```
 
 ## Test Accounts
@@ -107,6 +124,28 @@ The system comes pre-configured with test accounts from Anvil:
 Each account starts with 10,000 ETH on the local fork.
 
 ## Available Commands
+
+### 🧠 Intelligent Agent Commands
+
+The system automatically detects complex operations and uses the AI agent for intelligent planning:
+
+#### Multi-step Operations
+- `"Check Alice's balance, and if she has more than 5 ETH, swap 2 ETH for USDC"`
+- `"If Bob has enough balance, send 1 ETH to Carol then check Carol's new balance"`
+- `"Compare ETH balances across all accounts and show me the richest"`
+
+#### Analysis & Optimization
+- `"Find the best swap rate between USDC and WETH"`
+- `"Plan an optimal arbitrage strategy"`
+- `"What's the cheapest way to get WETH?"`
+- `"Analyze gas costs for different swap amounts"`
+
+#### Complex Queries
+- `"Check both Alice and Bob's balances, then suggest optimal swap amounts"`
+- `"Find contract address for LINK token and check if it's deployed"`
+- `"Compare multiple token prices before executing trades"`
+
+### 📖 Simple Commands (Legacy Compatibility)
 
 ### Balance Check
 - `"How much ETH does Alice have?"`
@@ -203,11 +242,14 @@ agent-eth/
 ### Components
 
 1. **CLI Client**:
-   - Interactive REPL using rustyline with colored output
-   - Direct Anthropic Claude API integration for natural language parsing
-   - Account alias resolution (Alice, Bob, Carol → hex addresses)
-   - RMCP client for communicating with server via stdio transport
-   - RAG system for documentation search with vector embeddings using SQLite
+   - **Intelligent Agent Core**: Advanced AI planning system with Claude integration for multi-step reasoning
+   - **Legacy Command Parser**: Backward-compatible simple command parsing system
+   - **Dynamic Tool Registry**: Automatic tool discovery and intelligent selection
+   - **Session Memory & Context**: Maintains operation history and execution context
+   - **Interactive REPL**: Enhanced interface with plan visualization and confirmation prompts
+   - **Account alias resolution**: Alice, Bob, Carol → hex addresses
+   - **RMCP client**: Communicates with server via stdio transport
+   - **RAG system**: Documentation search with vector embeddings using SQLite
 
 2. **RMCP Server**:
    - RMCP (Rust Model Context Protocol) v0.5.0 compliant server exposing Ethereum tools
@@ -299,17 +341,33 @@ The `#[tool]` macro automatically generates the tool schema and registration.
 
 ### Recent Major Updates
 
-1. **RMCP Migration** (`server/src/mcp_server.rs`, `server/Cargo.toml`):
+#### 🚀 **AI Agent Architecture Transformation** (Latest)
+1. **Intelligent Agent Core** (`client/src/agent.rs:589-915`):
+   - **Complete architectural overhaul**: Transformed from simple command parser to intelligent AI agent
+   - **AgentCore system**: Claude-powered planning and reasoning for complex operations
+   - **Multi-step execution engine**: Support for conditional logic and workflow dependencies
+   - **Dynamic tool selection**: AI chooses appropriate tools based on context and requirements
+   - **Session memory**: Maintains context and remembers previous operations
+
+2. **Enhanced CLI Interface** (`client/src/main.rs:185-487`):
+   - **Intelligent operation detection**: Automatically routes complex requests to AI agent
+   - **Plan visualization**: Shows execution plan with reasoning before execution
+   - **Confirmation system**: Smart risk assessment for dangerous operations
+   - **Graceful fallback**: Falls back to legacy parsing if AI agent fails
+   - **Enhanced help system**: Updated with intelligent agent examples
+
+#### 📡 **RMCP & Infrastructure Updates**
+3. **RMCP Migration** (`server/src/mcp_server.rs`, `server/Cargo.toml`):
    - Migrated from basic HTTP communication to RMCP v0.5.0
    - Added `#[tool_router]` and `#[tool]` macros for automatic tool registration
    - Provides standardized MCP-compliant tool exposure with schema generation
 
-2. **Alloy v1.0 Integration** (`server/src/provider.rs`, `server/Cargo.toml`):
+4. **Alloy v1.0 Integration** (`server/src/provider.rs`, `server/Cargo.toml`):
    - Migrated from deprecated ethers-rs to modern Alloy v1.0
    - Added real transaction execution with wallet integration
    - Improved performance and maintainability
 
-3. **Enhanced Logging** (`server/src/main.rs:11-14`):
+5. **Enhanced Logging** (`server/src/main.rs:11-14`):
    - Configured tracing to write to stderr to avoid stdio transport interference
    - Clean RMCP communication without log message corruption
 
