@@ -82,6 +82,28 @@ pub struct ToolRegistry {
     pub tools: HashMap<String, ToolInfo>,
 }
 
+// Helper function to extract JSON from markdown code blocks
+fn extract_json_from_response(content: &str) -> String {
+    // Check if the response is wrapped in markdown code blocks
+    if content.trim().starts_with("```json") && content.trim().ends_with("```") {
+        // Extract the JSON content between the code block markers
+        let lines: Vec<&str> = content.trim().lines().collect();
+        if lines.len() > 2 {
+            // Skip first line (```json) and last line (```)
+            return lines[1..lines.len() - 1].join("\n");
+        }
+    } else if content.trim().starts_with("```") && content.trim().ends_with("```") {
+        // Handle generic code blocks
+        let lines: Vec<&str> = content.trim().lines().collect();
+        if lines.len() > 2 {
+            return lines[1..lines.len() - 1].join("\n");
+        }
+    }
+
+    // Return original content if no code blocks found
+    content.to_string()
+}
+
 impl EthereumAgent {
     pub fn new(anthropic_api_key: &str) -> Result<Self> {
         let client = Client::new();
@@ -305,7 +327,7 @@ IMPORTANT: Always use "action" as the field name, never "command". Response must
             .header("anthropic-version", "2023-06-01")
             .header("content-type", "application/json")
             .json(&json!({
-                "model": "claude-3-5-sonnet-20241022",
+                "model": "claude-sonnet-4-0",
                 "max_tokens": 1024,
                 "system": system_prompt,
                 "messages": messages
@@ -335,12 +357,16 @@ IMPORTANT: Always use "action" as the field name, never "command". Response must
                 )
             })?;
 
+        // Extract JSON from potential markdown code blocks
+        let cleaned_content = extract_json_from_response(content);
+
         // Parse as generic JSON first to normalize field names
-        let mut json_value: serde_json::Value = serde_json::from_str(content).map_err(|e| {
+        let mut json_value: serde_json::Value = serde_json::from_str(&cleaned_content).map_err(|e| {
             anyhow::anyhow!(
-                "Failed to parse Claude response as JSON: {}\nResponse was: {}",
+                "Failed to parse Claude response as JSON: {}\nOriginal response: {}\nCleaned content: {}",
                 e,
-                content
+                content,
+                cleaned_content
             )
         })?;
 
@@ -420,7 +446,7 @@ IMPORTANT: Always use "action" as the field name, never "command". Response must
             .header("anthropic-version", "2023-06-01")
             .header("content-type", "application/json")
             .json(&json!({
-                "model": "claude-3-5-sonnet-20241022",
+                "model": "claude-sonnet-4-0",
                 "max_tokens": 1024,
                 "system": system_prompt,
                 "messages": messages
@@ -739,7 +765,7 @@ IMPORTANT: Only use tools that exist in the tool registry. Always validate addre
             .header("anthropic-version", "2023-06-01")
             .header("content-type", "application/json")
             .json(&json!({
-                "model": "claude-3-5-sonnet-20241022",
+                "model": "claude-sonnet-4-0",
                 "max_tokens": 2048,
                 "system": system_prompt,
                 "messages": messages
@@ -764,11 +790,15 @@ IMPORTANT: Only use tools that exist in the tool registry. Always validate addre
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Invalid response format from Claude API"))?;
 
-        let mut plan: AgentPlan = serde_json::from_str(content).map_err(|e| {
+        // Extract JSON from potential markdown code blocks
+        let cleaned_content = extract_json_from_response(content);
+
+        let mut plan: AgentPlan = serde_json::from_str(&cleaned_content).map_err(|e| {
             anyhow::anyhow!(
-                "Failed to parse agent plan: {}\nResponse was: {}",
+                "Failed to parse agent plan: {}\nOriginal response: {}\nCleaned content: {}",
                 e,
-                content
+                content,
+                cleaned_content
             )
         })?;
 
@@ -978,7 +1008,7 @@ IMPORTANT: Only use tools that exist in the tool registry. Always validate addre
             .header("anthropic-version", "2023-06-01")
             .header("content-type", "application/json")
             .json(&json!({
-                "model": "claude-3-5-sonnet-20241022",
+                "model": "claude-sonnet-4-0",
                 "max_tokens": 1024,
                 "system": system_prompt,
                 "messages": messages
