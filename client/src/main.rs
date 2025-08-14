@@ -1,6 +1,7 @@
 mod agent;
 mod cli;
 mod commands;
+mod error;
 mod mcp_client;
 mod rag;
 

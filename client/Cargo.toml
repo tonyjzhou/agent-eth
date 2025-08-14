@@ -28,3 +28,6 @@ futures = "0.3"
 walkdir = "2.0"
 chrono = { version = "0.4", features = ["serde"] }
 rusqlite = { version = "0.31.0", features = ["bundled"] }
+
+# Error handling
+thiserror = "1.0"

@@ -1,5 +1,6 @@
 mod api;
 mod contracts;
+mod error;
 mod mcp_server;
 mod provider;
 mod tools;

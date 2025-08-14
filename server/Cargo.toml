@@ -29,5 +29,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json"] }
 # External API integration
 regex = "1.0"
 
+# Error handling
+thiserror = "1.0"
+
 [dev-dependencies]
 tokio-test = "0.4"

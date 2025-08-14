@@ -1,3 +1,4 @@
+use crate::error::ServerError;
 use crate::provider::EthereumProvider;
 use anyhow::Result;
 
@@ -15,10 +16,8 @@ pub async fn check_contract_deployed(
             };
             Ok(result)
         }
-        Err(e) => Err(anyhow::anyhow!(
-            "Failed to check contract at {}: {}",
-            address,
-            e
-        )),
+        Err(e) => {
+            Err(ServerError::contract(format!("Failed to check contract at {address}: {e}")).into())
+        }
     }
 }

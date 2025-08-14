@@ -1,4 +1,5 @@
 use crate::agent::EthereumAgent;
+use crate::error::AgentError;
 use crate::mcp_client::McpClient;
 use anyhow::Result;
 use colored::*;
@@ -20,9 +21,7 @@ impl SwapCommand {
 
         let private_key = agent
             .get_private_key_for_address(&from_addr)
-            .ok_or_else(|| {
-                anyhow::anyhow!("No private key available for address: {}", from_addr)
-            })?;
+            .ok_or_else(|| AgentError::private_key(&from_addr))?;
 
         let slippage_bps = (slippage * 100.0) as u16;
 

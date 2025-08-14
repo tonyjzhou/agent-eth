@@ -1,3 +1,4 @@
+use crate::error::AgentError;
 use crate::mcp_client::McpClient;
 use crate::rag::RagSystem;
 use anyhow::Result;
@@ -352,8 +353,8 @@ IMPORTANT: Always use "action" as the field name, never "command". Response must
         let content = response_json["content"][0]["text"]
             .as_str()
             .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Invalid response format - expected content[0].text in API response"
+                AgentError::llm_parsing(
+                    "Invalid response format - expected content[0].text in API response",
                 )
             })?;
 
@@ -362,12 +363,9 @@ IMPORTANT: Always use "action" as the field name, never "command". Response must
 
         // Parse as generic JSON first to normalize field names
         let mut json_value: serde_json::Value = serde_json::from_str(&cleaned_content).map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to parse Claude response as JSON: {}\nOriginal response: {}\nCleaned content: {}",
-                e,
-                content,
-                cleaned_content
-            )
+            AgentError::llm_parsing(format!(
+                "Failed to parse Claude response as JSON: {e}\nOriginal response: {content}\nCleaned content: {cleaned_content}"
+            ))
         })?;
 
         // Normalize "command" to "action" for backward compatibility
@@ -380,28 +378,28 @@ IMPORTANT: Always use "action" as the field name, never "command". Response must
         }
 
         let parsed: ParsedCommand = serde_json::from_value(json_value.clone()).map_err(|e| {
-            anyhow::anyhow!(
+            AgentError::command_parsing(format!(
                 "Failed to parse normalized JSON as ParsedCommand: {}\nOriginal response: {}\nNormalized JSON: {}",
                 e,
                 content,
                 serde_json::to_string_pretty(&json_value).unwrap_or_default()
-            )
+            ))
         })?;
 
         // Resolve aliases
         let mut resolved = parsed;
         if let Some(ref addr) = resolved.from_address {
-            if let Some(real_addr) = self.account_aliases.get(&addr.to_lowercase()) {
+            if let Some(real_addr) = self.account_aliases.get(&addr.to_lowercase() as &str) {
                 resolved.from_address = Some(real_addr.clone());
             }
         }
         if let Some(ref addr) = resolved.to_address {
-            if let Some(real_addr) = self.account_aliases.get(&addr.to_lowercase()) {
+            if let Some(real_addr) = self.account_aliases.get(&addr.to_lowercase() as &str) {
                 resolved.to_address = Some(real_addr.clone());
             }
         }
         if let Some(ref addr) = resolved.address {
-            if let Some(real_addr) = self.account_aliases.get(&addr.to_lowercase()) {
+            if let Some(real_addr) = self.account_aliases.get(&addr.to_lowercase() as &str) {
                 resolved.address = Some(real_addr.clone());
             }
         }
@@ -788,18 +786,15 @@ IMPORTANT: Only use tools that exist in the tool registry. Always validate addre
 
         let content = response_json["content"][0]["text"]
             .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Invalid response format from Claude API"))?;
+            .ok_or_else(|| AgentError::llm_parsing("Invalid response format from Claude API"))?;
 
         // Extract JSON from potential markdown code blocks
         let cleaned_content = extract_json_from_response(content);
 
         let mut plan: AgentPlan = serde_json::from_str(&cleaned_content).map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to parse agent plan: {}\nOriginal response: {}\nCleaned content: {}",
-                e,
-                content,
-                cleaned_content
-            )
+            AgentError::llm_parsing(format!(
+                "Failed to parse agent plan: {e}\nOriginal response: {content}\nCleaned content: {cleaned_content}"
+            ))
         })?;
 
         // Resolve account aliases in parameters
@@ -836,11 +831,14 @@ IMPORTANT: Only use tools that exist in the tool registry. Always validate addre
             // Check dependencies
             if let Some(depends_on) = &step.depends_on {
                 if !executed_steps.contains_key(depends_on) {
-                    return Err(anyhow::anyhow!(
-                        "Step {} depends on {}, but that step hasn't been executed",
-                        step.step_id,
-                        depends_on
-                    ));
+                    return Err(AgentError::tool_execution(
+                        &step.tool_name,
+                        format!(
+                            "Step {} depends on {}, but that step hasn't been executed",
+                            step.step_id, depends_on
+                        ),
+                    )
+                    .into());
                 }
             }
 
@@ -926,7 +924,7 @@ IMPORTANT: Only use tools that exist in the tool registry. Always validate addre
                         .await?
                 }
                 _ => {
-                    return Err(anyhow::anyhow!("Unknown tool: {}", step.tool_name));
+                    return Err(AgentError::tool_execution(&step.tool_name, "Unknown tool").into());
                 }
             };
 

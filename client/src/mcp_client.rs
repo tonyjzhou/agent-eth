@@ -1,3 +1,4 @@
+use crate::error::AgentError;
 use anyhow::Result;
 use serde_json::{json, Value};
 use std::process::Stdio;
@@ -70,7 +71,7 @@ impl McpClient {
             stdin.write_all(request_str.as_bytes()).await?;
             stdin.flush().await?;
         } else {
-            return Err(anyhow::anyhow!("Server process has no stdin"));
+            return Err(AgentError::mcp("Server process has no stdin").into());
         }
 
         // Read response
@@ -91,10 +92,10 @@ impl McpClient {
                 })?;
                 Ok(response)
             } else {
-                Err(anyhow::anyhow!("Empty response from server"))
+                Err(AgentError::mcp("Empty response from server").into())
             }
         } else {
-            Err(anyhow::anyhow!("Server process has no stdout"))
+            Err(AgentError::mcp("Server process has no stdout").into())
         }
     }
 
@@ -150,7 +151,7 @@ impl McpClient {
                 .get("message")
                 .and_then(|m| m.as_str())
                 .unwrap_or("Unknown error");
-            return Err(anyhow::anyhow!("MCP error: {}", error_msg));
+            return Err(AgentError::mcp(format!("MCP error: {error_msg}")).into());
         }
 
         // Debug: Show what we received instead
