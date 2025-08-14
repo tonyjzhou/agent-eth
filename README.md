@@ -31,7 +31,7 @@ Claude ◄───► │   REPL          │                    │ • Transf
 ## Features
 
 ### 🧠 **Intelligent Agent System**
-- **AI Planning & Reasoning**: Claude-powered agent that creates execution plans for complex requests
+- **AI Planning & Reasoning**: Claude Sonnet 4.0-powered agent that creates execution plans for complex requests
 - **Multi-step Operations**: Support for conditional logic and workflow orchestration
 - **Dynamic Tool Selection**: Intelligent selection of blockchain tools based on context
 - **Session Memory**: Remembers previous operations and maintains execution context
@@ -341,7 +341,12 @@ The `#[tool]` macro automatically generates the tool schema and registration.
 
 ### Recent Major Updates
 
-#### 🚀 **AI Agent Architecture Transformation** (Latest)
+#### 🔧 **Claude 4.0 Model Upgrade** (Latest)
+- **Upgraded to Claude Sonnet 4.0**: Enhanced AI reasoning capabilities with the latest Claude model
+- **Fixed Compatibility**: Resolved JSON parsing issues with Claude 4.0's markdown-wrapped responses
+- **Maintained Compatibility**: No user-facing changes required, seamless upgrade
+
+#### 🚀 **AI Agent Architecture Transformation**
 1. **Intelligent Agent Core** (`client/src/agent.rs:589-915`):
    - **Complete architectural overhaul**: Transformed from simple command parser to intelligent AI agent
    - **AgentCore system**: Claude-powered planning and reasoning for complex operations
@@ -400,12 +405,17 @@ The `#[tool]` macro automatically generates the tool schema and registration.
    - **Solution**: Set environment variable: `export ANTHROPIC_API_KEY="your-api-key-here"`
    - **Check**: Verify key is set: `echo $ANTHROPIC_API_KEY`
 
-4. **RMCP Communication Issues**:
+4. **JSON Parsing Errors (Agent/Fallback)**:
+   - **Cause**: Claude API response format incompatibility (fixed in latest version)
+   - **Solution**: Ensure you're using the latest version with Claude 4.0 compatibility fix
+   - **Check**: Look for "Failed to parse Claude response as JSON" errors in output
+
+5. **RMCP Communication Issues**:
    - **Cause**: RMCP communication problem between client and server
    - **Solution**: Enable debug logging: `RUST_LOG=debug cargo run --bin agent-eth-client`
    - **Check**: Look for RMCP request/response debug messages in server logs
 
-5. **Build errors**: 
+6. **Build errors**: 
    - **Cause**: Incompatible Rust version or missing dependencies
    - **Solution**: Ensure Rust 1.70+ is installed: `rustup update`
 
