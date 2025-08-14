@@ -80,36 +80,88 @@ Claude ◄───► │   REPL          │                    │ • Transf
 
 ## Usage
 
+### 🚀 **Modern CLI Interface** (Recommended)
+
 1. **Start the Anvil fork** (in a separate terminal):
    ```bash
    anvil --fork-url https://eth-mainnet.g.alchemy.com/v2/4UjEl1ULr2lQYsGR5n7gGKd3pzgAzxKs
    ```
 
-2. **Run the client** (from the workspace root):
+2. **Use the modern CLI commands** (from the workspace root):
+   
+   **Get Command Help**:
    ```bash
-   ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client
-   ```
-
-   **Note**: The client automatically spawns the RMCP server as a subprocess, so no separate server process is needed.
-
-3. **Example Commands**:
-   
-   **Simple Operations** (legacy compatibility):
-   ```
-   eth> send 1 ETH from Alice to Bob
-   eth> How much ETH does Alice have?
-   eth> What's Bob's balance?
-   eth> Use Uniswap V2 Router to swap 10 ETH for USDC on Alice's account
+   ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client -- --help
    ```
    
-   **🧠 Intelligent Agent Operations** (automatically detected):
+   **Balance Check**:
+   ```bash
+   ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client -- balance Alice
+   ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client -- balance 0xf39... --token USDC
    ```
-   eth> Check Alice's balance, and if she has more than 5 ETH, swap 2 ETH for USDC
-   eth> Find the best swap rate between USDC and WETH
-   eth> Compare token balances across all accounts
-   eth> Plan an optimal arbitrage strategy
-   eth> If Bob has enough ETH, transfer 1 ETH to Carol, then swap 500 USDC for WETH
+   
+   **ETH Transfer**:
+   ```bash
+   ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client -- transfer 1.0 --from Alice --to Bob
    ```
+   
+   **Contract Check**:
+   ```bash
+   ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client -- contract-check 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
+   ```
+   
+   **Token Swap**:
+   ```bash
+   ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client -- swap 10 ETH USDC --from Alice --slippage 2.5
+   ```
+   
+   **🧠 AI Agent (Natural Language)**:
+   ```bash
+   ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client -- agent "Check Alice's balance, and if she has more than 5 ETH, swap 2 ETH for USDC"
+   ```
+   
+   **Documentation Search**:
+   ```bash
+   ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client -- docs "How do I calculate slippage?"
+   ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client -- ingest client/docs
+   ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client -- clear
+   ```
+   
+   **Interactive Mode** (Legacy REPL):
+   ```bash
+   ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client -- interactive
+   ```
+
+### 📖 **Help System**
+
+The modern CLI provides comprehensive help for all commands:
+
+```bash
+# Main help
+cargo run --bin agent-eth-client -- --help
+
+# Command-specific help
+cargo run --bin agent-eth-client -- balance --help
+cargo run --bin agent-eth-client -- transfer --help
+cargo run --bin agent-eth-client -- swap --help
+cargo run --bin agent-eth-client -- agent --help
+```
+
+### 🔄 **Legacy Interactive Mode**
+
+For users who prefer the old REPL interface:
+
+```bash
+ANTHROPIC_API_KEY="your-key" cargo run --bin agent-eth-client -- interactive
+```
+
+This preserves all the original functionality:
+```
+eth> send 1 ETH from Alice to Bob
+eth> How much ETH does Alice have?
+eth> Use Uniswap V2 Router to swap 10 ETH for USDC on Alice's account
+eth> Check Alice's balance, and if she has more than 5 ETH, swap 2 ETH for USDC
+```
 
 ## Test Accounts
 
@@ -186,10 +238,20 @@ agent-eth/
 │   ├── Cargo.toml
 │   ├── docs/               # Uniswap documentation for RAG
 │   └── src/
-│       ├── main.rs         # CLI REPL interface
+│       ├── main.rs         # Modern CLI with clap subcommands
 │       ├── lib.rs          # Library exports
+│       ├── cli.rs          # Clap CLI structure and subcommands
 │       ├── agent.rs        # Claude API integration
 │       ├── mcp_client.rs   # MCP client for server communication
+│       ├── commands/       # Modern command modules
+│       │   ├── mod.rs      # Command module exports
+│       │   ├── balance.rs  # Balance checking command
+│       │   ├── transfer.rs # ETH transfer command
+│       │   ├── contract_check.rs # Contract verification command
+│       │   ├── swap.rs     # Token swap command
+│       │   ├── docs.rs     # Documentation/RAG commands
+│       │   ├── agent.rs    # AI agent command
+│       │   └── interactive.rs # Legacy REPL mode
 │       ├── bin/
 │       │   └── test_client.rs # Test client for debugging
 │       └── rag/            # RAG system implementation
@@ -341,7 +403,15 @@ The `#[tool]` macro automatically generates the tool schema and registration.
 
 ### Recent Major Updates
 
-#### 🔧 **Claude 4.0 Model Upgrade** (Latest)
+#### 🎛️ **Modern CLI Architecture** (Latest)
+- **Clap-based Subcommands**: Replaced 2017-era REPL pattern with modern CLI framework
+- **Command Discovery**: Users can explore commands with `--help` and command-specific help
+- **Modular Design**: Each command extracted into dedicated modules for maintainability
+- **Interactive Prompts**: Enhanced confirmation dialogs using `inquire` for better UX
+- **Backward Compatibility**: Legacy REPL mode preserved as `interactive` subcommand
+- **Shell Completion**: Built-in support for shell auto-completion (via clap)
+
+#### 🔧 **Claude 4.0 Model Upgrade** 
 - **Upgraded to Claude Sonnet 4.0**: Enhanced AI reasoning capabilities with the latest Claude model
 - **Fixed Compatibility**: Resolved JSON parsing issues with Claude 4.0's markdown-wrapped responses
 - **Maintained Compatibility**: No user-facing changes required, seamless upgrade
