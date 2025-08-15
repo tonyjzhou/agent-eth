@@ -1,4 +1,4 @@
-use crate::agent::EthereumAgent;
+use crate::agent::AgentCore;
 use crate::error::AgentError;
 use crate::mcp_client::McpClient;
 use anyhow::Result;
@@ -13,7 +13,7 @@ impl TransferCommand {
         from: &str,
         to: &str,
         mcp_client: &mut McpClient,
-        agent: &EthereumAgent,
+        agent: &AgentCore,
     ) -> Result<()> {
         let from_addr = Self::resolve_address(from);
         let to_addr = Self::resolve_address(to);

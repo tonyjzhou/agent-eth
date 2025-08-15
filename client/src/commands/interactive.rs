@@ -1,4 +1,4 @@
-use crate::agent::{AgentCore, EthereumAgent};
+use crate::agent::AgentCore;
 use crate::mcp_client::McpClient;
 use anyhow::Result;
 use colored::*;
@@ -8,11 +8,7 @@ use std::io::{self, Write};
 pub struct InteractiveCommand;
 
 impl InteractiveCommand {
-    pub async fn start(
-        agent: &mut EthereumAgent,
-        agent_core: &mut AgentCore,
-        mcp_client: &mut McpClient,
-    ) -> Result<()> {
+    pub async fn start(agent_core: &mut AgentCore, mcp_client: &mut McpClient) -> Result<()> {
         println!("{}", "🚀 Starting Interactive Mode...".bright_blue().bold());
         println!(
             "{}",
@@ -50,7 +46,7 @@ impl InteractiveCommand {
                                 "🗑️  Clearing all ingested documents...".bright_yellow()
                             );
 
-                            match agent.clear_documents().await {
+                            match agent_core.clear_documents().await {
                                 Ok(()) => {
                                     println!(
                                         "{} All documents cleared from RAG system",
@@ -104,7 +100,7 @@ impl InteractiveCommand {
                                 query.italic()
                             );
 
-                            if let Ok(answer) = agent.answer_documentation_query(query).await {
+                            if let Ok(answer) = agent_core.answer_documentation_query(query).await {
                                 println!("{} {}", "📖".bright_blue(), answer);
                             } else {
                                 println!("{}", "❌ Failed to search documentation".bright_red());
@@ -120,7 +116,7 @@ impl InteractiveCommand {
                                     dir_path
                                 );
 
-                                match agent.ingest_documents(dir_path).await {
+                                match agent_core.ingest_documents(dir_path).await {
                                     Ok(count) => {
                                         println!(
                                             "{} Ingested {} documents",
@@ -149,7 +145,7 @@ impl InteractiveCommand {
                                             .bright_yellow()
                                     );
                                     if let Err(e2) =
-                                        Self::handle_command(agent, mcp_client, input).await
+                                        Self::handle_command(agent_core, mcp_client, input).await
                                     {
                                         println!(
                                             "{} {}",
@@ -162,7 +158,7 @@ impl InteractiveCommand {
                             }
 
                             // Check if this might be a documentation query
-                            if agent.is_documentation_query(input).await {
+                            if agent_core.is_documentation_query(input).await {
                                 println!(
                                     "{} {}",
                                     "🔍 Searching docs for:".bright_blue(),
@@ -178,7 +174,9 @@ impl InteractiveCommand {
                             }
 
                             // Default to legacy command handling for simple operations
-                            if let Err(e) = Self::handle_command(agent, mcp_client, input).await {
+                            if let Err(e) =
+                                Self::handle_command(agent_core, mcp_client, input).await
+                            {
                                 println!("{} {}", "❌ Error:".bright_red().bold(), e);
                             }
                         }
@@ -204,7 +202,7 @@ impl InteractiveCommand {
 
     // Helper functions extracted from main.rs
     async fn handle_command(
-        agent: &EthereumAgent,
+        agent: &AgentCore,
         mcp_client: &mut McpClient,
         input: &str,
     ) -> Result<()> {

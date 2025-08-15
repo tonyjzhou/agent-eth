@@ -1,4 +1,3 @@
-use crate::error::AgentError;
 use crate::mcp_client::McpClient;
 use crate::rag::RagSystem;
 use crate::tools::TypedToolRegistry;
@@ -8,14 +7,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::fmt::Write;
-
-#[derive(Debug, Clone)]
-pub struct EthereumAgent {
-    client: Client,
-    api_key: String,
-    account_aliases: HashMap<String, String>,
-    rag: Option<RagSystem>,
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ParsedCommand {
@@ -69,6 +60,7 @@ pub struct AgentCore {
 
 #[derive(Debug, Clone)]
 pub struct ToolInfo {
+    #[allow(dead_code)]
     pub name: String,
     pub description: String,
     pub parameters: Vec<ToolParameter>,
@@ -98,7 +90,7 @@ fn extract_json_from_response(content: &str) -> String {
             return lines[1..lines.len() - 1].join("\n");
         }
     } else if content.trim().starts_with("```") && content.trim().ends_with("```") {
-        // Handle generic code blocks
+        // Generic code block - try to extract content
         let lines: Vec<&str> = content.trim().lines().collect();
         if lines.len() > 2 {
             return lines[1..lines.len() - 1].join("\n");
@@ -109,396 +101,6 @@ fn extract_json_from_response(content: &str) -> String {
     content.to_string()
 }
 
-impl EthereumAgent {
-    pub fn new(anthropic_api_key: &str) -> Result<Self> {
-        let client = Client::new();
-
-        let mut account_aliases = HashMap::new();
-        account_aliases.insert(
-            "alice".to_lowercase(),
-            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266".to_string(),
-        );
-        account_aliases.insert(
-            "bob".to_lowercase(),
-            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8".to_string(),
-        );
-        account_aliases.insert(
-            "carol".to_lowercase(),
-            "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC".to_string(),
-        );
-
-        Ok(Self {
-            client,
-            api_key: anthropic_api_key.to_string(),
-            account_aliases,
-            rag: None,
-        })
-    }
-
-    pub async fn initialize_rag(&mut self, db_path: &str) -> Result<()> {
-        let rag_system = RagSystem::new(db_path).await?;
-        self.rag = Some(rag_system);
-        Ok(())
-    }
-
-    pub async fn search_docs(&self, query: &str) -> Result<Vec<crate::rag::SearchResult>> {
-        if let Some(rag) = &self.rag {
-            // Increase limit since we now have more focused chunks
-            rag.search(query, 15).await
-        } else {
-            Ok(vec![])
-        }
-    }
-
-    pub async fn ingest_documents(&mut self, dir_path: &str) -> Result<usize> {
-        if let Some(rag) = &mut self.rag {
-            rag.ingest_directory(dir_path).await
-        } else {
-            Err(anyhow::anyhow!("RAG system not initialized"))
-        }
-    }
-
-    pub async fn clear_documents(&mut self) -> Result<()> {
-        if let Some(rag) = &mut self.rag {
-            rag.clear_documents().await
-        } else {
-            Err(anyhow::anyhow!("RAG system not initialized"))
-        }
-    }
-
-    pub async fn is_documentation_query(&self, input: &str) -> bool {
-        let input_lower = input.to_lowercase();
-
-        // First check for clear documentation indicators - if present, it's a doc query
-        let doc_keywords = [
-            "explain how",
-            "what is the difference",
-            "how do i",
-            "how does",
-            "documentation",
-            "docs ",
-            "what are the steps",
-            "how to calculate",
-            "what does this mean",
-            "difference between",
-        ];
-
-        if doc_keywords
-            .iter()
-            .any(|&keyword| input_lower.contains(keyword))
-        {
-            return true;
-        }
-
-        // Then check if this looks like a blockchain operation - if so, it's NOT a doc query
-        let blockchain_patterns = [
-            // Balance queries
-            "much eth",
-            "much usdc",
-            "much token",
-            "eth does",
-            "usdc does",
-            "token does",
-            "balance of",
-            "balance for",
-            // Transfer operations
-            "send",
-            "transfer",
-            "from alice",
-            "from bob",
-            "from carol",
-            "to alice",
-            "to bob",
-            "to carol",
-            // Swap operations with specific patterns that indicate actual swaps
-            "swap 10",
-            "swap 1 ",
-            "swap 0.", // for decimal amounts
-            "use uniswap",
-            "uniswap v2 router",
-            "for usdc",
-            "for eth",
-            "for weth",
-            // Contract operations
-            "deployed at",
-            "contract at",
-            "check contract",
-        ];
-
-        if blockchain_patterns
-            .iter()
-            .any(|&pattern| input_lower.contains(pattern))
-        {
-            return false;
-        }
-
-        // Default to false for anything else (neither clear doc query nor blockchain operation)
-        false
-    }
-
-    pub async fn parse_command(&self, user_input: &str) -> Result<ParsedCommand> {
-        // Check if this is a documentation query and get RAG context
-        let mut additional_context = String::new();
-        if self.is_documentation_query(user_input).await {
-            if let Ok(search_results) = self.search_docs(user_input).await {
-                if !search_results.is_empty() {
-                    additional_context = "\n\nRelevant Documentation Context:\n".to_string();
-                    for result in search_results.iter().take(5) {
-                        // Show more context since chunks are now better organized
-                        let chunk_preview = if result.relevant_chunk.len() > 800 {
-                            format!(
-                                "{}...",
-                                result.relevant_chunk.chars().take(800).collect::<String>()
-                            )
-                        } else {
-                            result.relevant_chunk.clone()
-                        };
-                        write!(
-                            additional_context,
-                            "Document: {} ({})\n{}\n\n",
-                            result.document.title, result.document.source, chunk_preview
-                        )
-                        .expect("String formatting should not fail");
-                    }
-                }
-            }
-        }
-
-        let system_prompt = format!(
-            r#"You are an Ethereum blockchain assistant that helps users interact with the blockchain using natural language.{additional_context}
-
-Parse user requests into JSON with EXACTLY this structure. Use "action" (not "command") as the field name:
-
-For balance queries:
-{{
-  "action": "balance",
-  "address": "0x...",
-  "token": "ETH"
-}}
-
-For token balance queries:
-{{
-  "action": "balance", 
-  "address": "0x...",
-  "token": "USDC"
-}}
-
-For transfers:
-{{
-  "action": "transfer", 
-  "from_address": "0x...",
-  "to_address": "0x...",
-  "amount": "1.0"
-}}
-
-For contract checks:
-{{
-  "action": "contract_check",
-  "address": "0x..."
-}}
-
-For token swaps (including Uniswap commands):
-{{
-  "action": "swap",
-  "from_address": "0x...",
-  "token_in": "ETH",
-  "token_out": "USDC", 
-  "amount_in": "10.0",
-  "slippage_bps": 200
-}}
-
-Examples of swap commands to recognize:
-- "Use Uniswap V2 Router to swap 10 ETH for USDC on Alice's account"
-- "Swap 5 ETH for USDC from Bob's account"  
-- "Convert 1000 USDC to ETH using Alice"
-
-Account aliases (resolve these to hex addresses):
-- Alice: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-- Bob: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
-- Carol: 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
-
-IMPORTANT: Always use "action" as the field name, never "command". Response must be valid JSON only."#
-        );
-
-        let messages = json!([
-            {
-                "role": "user",
-                "content": format!("Parse this user command into a structured format: {}\n\nRespond with JSON only.", user_input)
-            }
-        ]);
-
-        let response = self
-            .client
-            .post("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", &self.api_key)
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
-            .json(&json!({
-                "model": "claude-sonnet-4-0",
-                "max_tokens": 1024,
-                "system": system_prompt,
-                "messages": messages
-            }))
-            .send()
-            .await?;
-
-        let response_text = response.text().await?;
-        let response_json: serde_json::Value = serde_json::from_str(&response_text)?;
-
-        // Check for API errors first
-        if let Some(error) = response_json.get("error") {
-            return Err(anyhow::anyhow!(
-                "Claude API error: {}",
-                error
-                    .get("message")
-                    .and_then(|m| m.as_str())
-                    .unwrap_or("Unknown error")
-            ));
-        }
-
-        let content = response_json["content"][0]["text"]
-            .as_str()
-            .ok_or_else(|| {
-                AgentError::llm_parsing(
-                    "Invalid response format - expected content[0].text in API response",
-                )
-            })?;
-
-        // Extract JSON from potential markdown code blocks
-        let cleaned_content = extract_json_from_response(content);
-
-        // Parse as generic JSON first to normalize field names
-        let mut json_value: serde_json::Value = serde_json::from_str(&cleaned_content).map_err(|e| {
-            AgentError::llm_parsing(format!(
-                "Failed to parse Claude response as JSON: {e}\nOriginal response: {content}\nCleaned content: {cleaned_content}"
-            ))
-        })?;
-
-        // Normalize "command" to "action" for backward compatibility
-        if let Some(obj) = json_value.as_object_mut() {
-            if obj.contains_key("command") && !obj.contains_key("action") {
-                if let Some(command_value) = obj.remove("command") {
-                    obj.insert("action".to_string(), command_value);
-                }
-            }
-        }
-
-        let json_value_for_error = json_value.clone(); // Keep clone only for error message
-        let parsed: ParsedCommand = serde_json::from_value(json_value).map_err(|e| {
-            AgentError::command_parsing(format!(
-                "Failed to parse normalized JSON as ParsedCommand: {}\nOriginal response: {}\nNormalized JSON: {}",
-                e,
-                content,
-                serde_json::to_string_pretty(&json_value_for_error).unwrap_or_default()
-            ))
-        })?;
-
-        // Resolve aliases
-        let mut resolved = parsed;
-        if let Some(ref addr) = resolved.from_address {
-            if let Some(real_addr) = self.account_aliases.get(&addr.to_lowercase() as &str) {
-                resolved.from_address = Some(real_addr.clone());
-            }
-        }
-        if let Some(ref addr) = resolved.to_address {
-            if let Some(real_addr) = self.account_aliases.get(&addr.to_lowercase() as &str) {
-                resolved.to_address = Some(real_addr.clone());
-            }
-        }
-        if let Some(ref addr) = resolved.address {
-            if let Some(real_addr) = self.account_aliases.get(&addr.to_lowercase() as &str) {
-                resolved.address = Some(real_addr.clone());
-            }
-        }
-
-        Ok(resolved)
-    }
-
-    pub async fn answer_documentation_query(&self, query: &str) -> Result<String> {
-        let search_results = self.search_docs(query).await?;
-
-        if search_results.is_empty() {
-            return Ok(
-                "I don't have specific documentation for that query in my knowledge base."
-                    .to_string(),
-            );
-        }
-
-        // Build context from search results - use more results since chunks are better organized
-        let mut context = String::with_capacity(8192);
-        for result in search_results.iter().take(8) {
-            write!(
-                context,
-                "Source: {} ({})\n{}\n\n---\n\n",
-                result.document.title, result.document.source, result.relevant_chunk
-            )
-            .expect("String formatting should not fail");
-        }
-
-        let system_prompt = format!(
-            "You are an expert on Ethereum and Uniswap. Answer the user's question based on the provided documentation context. Be accurate and specific.\n\nContext:\n{context}"
-        );
-
-        let messages = json!([
-            {
-                "role": "user",
-                "content": query
-            }
-        ]);
-
-        let response = self
-            .client
-            .post("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", &self.api_key)
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
-            .json(&json!({
-                "model": "claude-sonnet-4-0",
-                "max_tokens": 1024,
-                "system": system_prompt,
-                "messages": messages
-            }))
-            .send()
-            .await?;
-
-        let response_text = response.text().await?;
-        let response_json: serde_json::Value = serde_json::from_str(&response_text)?;
-
-        if let Some(error) = response_json.get("error") {
-            return Err(anyhow::anyhow!(
-                "Claude API error: {}",
-                error
-                    .get("message")
-                    .and_then(|m| m.as_str())
-                    .unwrap_or("Unknown error")
-            ));
-        }
-
-        let content = response_json["content"][0]["text"]
-            .as_str()
-            .unwrap_or("Unable to generate response");
-
-        Ok(content.to_string())
-    }
-
-    pub fn get_private_key_for_address(&self, address: &str) -> Option<String> {
-        // Predefined private keys for test accounts
-        match address {
-            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" => Some(
-                "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string(),
-            ),
-            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" => Some(
-                "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d".to_string(),
-            ),
-            "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC" => Some(
-                "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a".to_string(),
-            ),
-            _ => None,
-        }
-    }
-}
-
-// Implementation for the new AgentCore
 impl Default for ToolRegistry {
     fn default() -> Self {
         Self::new()
@@ -509,25 +111,24 @@ impl ToolRegistry {
     pub fn new() -> Self {
         let mut tools = HashMap::new();
 
-        // Register available blockchain tools
+        // Define available tools that the AI agent can use
         tools.insert(
             "get_balance".to_string(),
             ToolInfo {
                 name: "get_balance".to_string(),
-                description: "Get the balance of an Ethereum address for ETH or ERC20 tokens"
-                    .to_string(),
+                description: "Get ETH or token balance for an Ethereum address".to_string(),
                 parameters: vec![
                     ToolParameter {
                         name: "address".to_string(),
                         param_type: "string".to_string(),
                         required: true,
-                        description: "The Ethereum address to check".to_string(),
+                        description: "Ethereum address to check balance for".to_string(),
                     },
                     ToolParameter {
                         name: "token".to_string(),
                         param_type: "string".to_string(),
                         required: false,
-                        description: "Token symbol (defaults to ETH)".to_string(),
+                        description: "Token symbol (e.g., 'ETH', 'USDC')".to_string(),
                     },
                 ],
             },
@@ -543,19 +144,25 @@ impl ToolRegistry {
                         name: "from_address".to_string(),
                         param_type: "string".to_string(),
                         required: true,
-                        description: "The sender's address".to_string(),
+                        description: "Address to send ETH from".to_string(),
                     },
                     ToolParameter {
                         name: "to_address".to_string(),
                         param_type: "string".to_string(),
                         required: true,
-                        description: "The recipient's address".to_string(),
+                        description: "Address to send ETH to".to_string(),
                     },
                     ToolParameter {
                         name: "amount_eth".to_string(),
                         param_type: "string".to_string(),
                         required: true,
                         description: "Amount of ETH to send".to_string(),
+                    },
+                    ToolParameter {
+                        name: "private_key".to_string(),
+                        param_type: "string".to_string(),
+                        required: true,
+                        description: "Private key of the sender".to_string(),
                     },
                 ],
             },
@@ -570,7 +177,7 @@ impl ToolRegistry {
                     name: "address".to_string(),
                     param_type: "string".to_string(),
                     required: true,
-                    description: "The contract address to check".to_string(),
+                    description: "Contract address to check".to_string(),
                 }],
             },
         );
@@ -585,31 +192,38 @@ impl ToolRegistry {
                         name: "from_address".to_string(),
                         param_type: "string".to_string(),
                         required: true,
-                        description: "The address executing the swap".to_string(),
+                        description: "Address executing the swap".to_string(),
                     },
                     ToolParameter {
                         name: "token_in".to_string(),
                         param_type: "string".to_string(),
                         required: true,
-                        description: "Input token symbol".to_string(),
+                        description: "Input token symbol (e.g., 'ETH', 'USDC')".to_string(),
                     },
                     ToolParameter {
                         name: "token_out".to_string(),
                         param_type: "string".to_string(),
                         required: true,
-                        description: "Output token symbol".to_string(),
+                        description: "Output token symbol (e.g., 'USDC', 'ETH')".to_string(),
                     },
                     ToolParameter {
                         name: "amount_in".to_string(),
                         param_type: "string".to_string(),
                         required: true,
-                        description: "Amount of input tokens".to_string(),
+                        description: "Amount of input token to swap".to_string(),
                     },
                     ToolParameter {
                         name: "slippage_bps".to_string(),
                         param_type: "number".to_string(),
                         required: false,
-                        description: "Slippage tolerance in basis points (default 200)".to_string(),
+                        description: "Slippage tolerance in basis points (default: 200 = 2%)"
+                            .to_string(),
+                    },
+                    ToolParameter {
+                        name: "private_key".to_string(),
+                        param_type: "string".to_string(),
+                        required: true,
+                        description: "Private key of the sender".to_string(),
                     },
                 ],
             },
@@ -619,21 +233,20 @@ impl ToolRegistry {
     }
 
     pub fn get_tools_description(&self) -> String {
-        // Pre-allocate capacity for better performance
-        let mut description = String::with_capacity(1024);
+        let mut description = String::with_capacity(2048);
         description.push_str("Available blockchain tools:\n");
 
-        for tool in self.tools.values() {
-            write!(description, "\n- {}: {}\n", tool.name, tool.description)
+        for (name, tool) in &self.tools {
+            write!(description, "\n{}: {}\n", name, tool.description)
                 .expect("String formatting should not fail");
-            description.push_str("  Parameters:\n");
+            description.push_str("Parameters:\n");
             for param in &tool.parameters {
                 let required_str = if param.required {
-                    "(required)"
+                    "required"
                 } else {
-                    "(optional)"
+                    "optional"
                 };
-                writeln!(
+                write!(
                     description,
                     "    - {} {}: {} {}",
                     param.name, param.param_type, param.description, required_str
@@ -687,323 +300,7 @@ impl AgentCore {
         Ok(())
     }
 
-    pub async fn plan_execution(&mut self, user_input: &str) -> Result<AgentPlan> {
-        // Build context for the AI agent
-        let mut context_info = String::with_capacity(2048);
-
-        // Add tool registry info
-        context_info.push_str(&self.tool_registry.get_tools_description());
-
-        // Add account aliases
-        context_info.push_str("\nAvailable test accounts:\n");
-        for (alias, address) in &self.account_aliases {
-            writeln!(context_info, "- {alias}: {address}")
-                .expect("String formatting should not fail");
-        }
-
-        // Add session memory if any
-        if !self.context.session_memory.is_empty() {
-            context_info.push_str("\nRecent operations in this session:\n");
-            for memory in self.context.session_memory.iter().rev().take(5) {
-                writeln!(context_info, "- {memory}").expect("String formatting should not fail");
-            }
-        }
-
-        // Search RAG for relevant documentation if available
-        if let Some(rag) = &self.rag {
-            if let Ok(search_results) = rag.search(user_input, 3).await {
-                if !search_results.is_empty() {
-                    context_info.push_str("\nRelevant documentation:\n");
-                    for result in search_results.iter().take(2) {
-                        let preview = if result.relevant_chunk.len() > 200 {
-                            format!(
-                                "{}...",
-                                result.relevant_chunk.chars().take(200).collect::<String>()
-                            )
-                        } else {
-                            result.relevant_chunk.clone()
-                        };
-                        writeln!(context_info, "- {}: {}", result.document.title, preview)
-                            .expect("String formatting should not fail");
-                    }
-                }
-            }
-        }
-
-        let system_prompt = format!(
-            r#"You are an intelligent Ethereum blockchain agent that creates execution plans for user requests.
-
-Your task is to analyze the user's request and create a detailed execution plan using the available tools.
-
-{context_info}
-
-Guidelines:
-1. Always think step by step and explain your reasoning
-2. Break complex operations into smaller steps  
-3. Consider dependencies between steps
-4. Resolve account aliases (alice, bob, carol) to actual addresses
-5. For dangerous operations (large transfers, irreversible swaps), set requires_confirmation: true
-6. Include parameter validation and error handling considerations
-7. For queries like balance checks, documentation searches, set requires_confirmation: false
-
-Response format (JSON only):
-{{
-  "reasoning": "Detailed explanation of your analysis and approach",
-  "steps": [
-    {{
-      "step_id": "step_1",
-      "description": "Human readable description", 
-      "tool_name": "get_balance",
-      "parameters": {{"address": "0x...", "token": "ETH"}},
-      "depends_on": null
-    }}
-  ],
-  "requires_confirmation": false
-}}
-
-IMPORTANT: Only use tools that exist in the tool registry. Always validate addresses and parameters."#
-        );
-
-        let messages = json!([
-            {
-                "role": "user",
-                "content": format!("Create an execution plan for: {}", user_input)
-            }
-        ]);
-
-        let response = self
-            .client
-            .post("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", &self.api_key)
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
-            .json(&json!({
-                "model": "claude-sonnet-4-0",
-                "max_tokens": 2048,
-                "system": system_prompt,
-                "messages": messages
-            }))
-            .send()
-            .await?;
-
-        let response_text = response.text().await?;
-        let response_json: serde_json::Value = serde_json::from_str(&response_text)?;
-
-        if let Some(error) = response_json.get("error") {
-            return Err(anyhow::anyhow!(
-                "Claude API error: {}",
-                error
-                    .get("message")
-                    .and_then(|m| m.as_str())
-                    .unwrap_or("Unknown error")
-            ));
-        }
-
-        let content = response_json["content"][0]["text"]
-            .as_str()
-            .ok_or_else(|| AgentError::llm_parsing("Invalid response format from Claude API"))?;
-
-        // Extract JSON from potential markdown code blocks
-        let cleaned_content = extract_json_from_response(content);
-
-        let mut plan: AgentPlan = serde_json::from_str(&cleaned_content).map_err(|e| {
-            AgentError::llm_parsing(format!(
-                "Failed to parse agent plan: {e}\nOriginal response: {content}\nCleaned content: {cleaned_content}"
-            ))
-        })?;
-
-        // Resolve account aliases in parameters
-        for step in &mut plan.steps {
-            if let Some(obj) = step.parameters.as_object_mut() {
-                for (_key, value) in obj.iter_mut() {
-                    if let Some(addr_str) = value.as_str() {
-                        if let Some(real_addr) = self.account_aliases.get(&addr_str.to_lowercase())
-                        {
-                            *value = serde_json::Value::String(real_addr.clone());
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(plan)
-    }
-
-    pub async fn execute_plan(
-        &mut self,
-        plan: AgentPlan,
-        mcp_client: &mut McpClient,
-    ) -> Result<Vec<String>> {
-        let mut results = Vec::new();
-        let mut executed_steps = HashMap::new();
-
-        // Add this operation to session memory
-        self.context
-            .session_memory
-            .push(format!("Executed plan: {}", plan.reasoning));
-
-        for step in &plan.steps {
-            // Check dependencies
-            if let Some(depends_on) = &step.depends_on {
-                if !executed_steps.contains_key(depends_on) {
-                    return Err(AgentError::tool_execution(
-                        &step.tool_name,
-                        format!(
-                            "Step {} depends on {}, but that step hasn't been executed",
-                            step.step_id, depends_on
-                        ),
-                    )
-                    .into());
-                }
-            }
-
-            // Execute the step
-            let result = match step.tool_name.as_str() {
-                "get_balance" => {
-                    let address = step.parameters["address"]
-                        .as_str()
-                        .ok_or_else(|| anyhow::anyhow!("Missing address parameter"))?;
-                    let token = step.parameters.get("token").and_then(|t| t.as_str());
-                    mcp_client.get_balance(address, token).await?
-                }
-                "send_transfer" => {
-                    let from_address = step.parameters["from_address"]
-                        .as_str()
-                        .ok_or_else(|| anyhow::anyhow!("Missing from_address parameter"))?;
-                    let to_address = step.parameters["to_address"]
-                        .as_str()
-                        .ok_or_else(|| anyhow::anyhow!("Missing to_address parameter"))?;
-                    let amount_eth = step.parameters["amount_eth"]
-                        .as_str()
-                        .ok_or_else(|| anyhow::anyhow!("Missing amount_eth parameter"))?;
-
-                    // Get private key
-                    let private_key =
-                        self.get_private_key_for_address(from_address)
-                            .ok_or_else(|| {
-                                anyhow::anyhow!(
-                                    "No private key available for address: {}",
-                                    from_address
-                                )
-                            })?;
-
-                    mcp_client
-                        .send_transfer(from_address, to_address, amount_eth, &private_key)
-                        .await?
-                }
-                "check_contract" => {
-                    let address = step.parameters["address"]
-                        .as_str()
-                        .ok_or_else(|| anyhow::anyhow!("Missing address parameter"))?;
-                    mcp_client.check_contract(address).await?
-                }
-                "execute_swap" => {
-                    let from_address = step.parameters["from_address"]
-                        .as_str()
-                        .ok_or_else(|| anyhow::anyhow!("Missing from_address parameter"))?;
-                    let token_in = step.parameters["token_in"]
-                        .as_str()
-                        .ok_or_else(|| anyhow::anyhow!("Missing token_in parameter"))?;
-                    let token_out = step.parameters["token_out"]
-                        .as_str()
-                        .ok_or_else(|| anyhow::anyhow!("Missing token_out parameter"))?;
-                    let amount_in = step.parameters["amount_in"]
-                        .as_str()
-                        .ok_or_else(|| anyhow::anyhow!("Missing amount_in parameter"))?;
-                    let slippage_bps = step
-                        .parameters
-                        .get("slippage_bps")
-                        .and_then(|s| s.as_u64())
-                        .map(|s| s as u16)
-                        .unwrap_or(200);
-
-                    // Get private key
-                    let private_key =
-                        self.get_private_key_for_address(from_address)
-                            .ok_or_else(|| {
-                                anyhow::anyhow!(
-                                    "No private key available for address: {}",
-                                    from_address
-                                )
-                            })?;
-
-                    mcp_client
-                        .execute_swap(
-                            from_address,
-                            token_in,
-                            token_out,
-                            amount_in,
-                            slippage_bps,
-                            &private_key,
-                        )
-                        .await?
-                }
-                _ => {
-                    return Err(AgentError::tool_execution(&step.tool_name, "Unknown tool").into());
-                }
-            };
-
-            // Store result for potential use by dependent steps
-            executed_steps.insert(
-                step.step_id.clone(),
-                serde_json::Value::String(result.clone()),
-            );
-            self.context.step_results.insert(
-                step.step_id.clone(),
-                serde_json::Value::String(result.clone()),
-            );
-
-            results.push(format!("✅ {}: {}", step.description, result));
-        }
-
-        Ok(results)
-    }
-
-    pub fn get_private_key_for_address(&self, address: &str) -> Option<String> {
-        // Reuse the same logic from EthereumAgent
-        match address {
-            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" => Some(
-                "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string(),
-            ),
-            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" => Some(
-                "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d".to_string(),
-            ),
-            "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC" => Some(
-                "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a".to_string(),
-            ),
-            _ => None,
-        }
-    }
-
-    /// Execute tool using the new structured tool system
-    #[allow(dead_code)]
-    pub async fn execute_typed_tool(
-        &self,
-        name: &str,
-        params: serde_json::Value,
-    ) -> Result<serde_json::Value> {
-        self.typed_tools.execute_tool(name, params).await
-    }
-
-    /// Get structured tool descriptions for AI agent
-    #[allow(dead_code)]
-    pub fn get_typed_tools_description(&self) -> String {
-        self.typed_tools.get_tools_description()
-    }
-
-    /// Check if a tool exists in the typed registry
-    #[allow(dead_code)]
-    pub fn has_typed_tool(&self, name: &str) -> bool {
-        self.typed_tools.get_tool(name).is_some()
-    }
-
-    /// List all available typed tools
-    #[allow(dead_code)]
-    pub fn list_typed_tools(&self) -> Vec<String> {
-        self.typed_tools.tool_names()
-    }
-
-    // Delegation methods for RAG functionality
+    // RAG system delegation methods
     pub async fn search_docs(&self, query: &str) -> Result<Vec<crate::rag::SearchResult>> {
         if let Some(rag) = &self.rag {
             rag.search(query, 15).await
@@ -1012,37 +309,152 @@ IMPORTANT: Only use tools that exist in the tool registry. Always validate addre
         }
     }
 
-    pub async fn answer_documentation_query(&self, query: &str) -> Result<String> {
-        // Reuse the same logic from EthereumAgent but simplified
-        let search_results = self.search_docs(query).await?;
+    pub async fn ingest_documents(&mut self, dir_path: &str) -> Result<usize> {
+        if let Some(rag) = &mut self.rag {
+            rag.ingest_directory(dir_path).await
+        } else {
+            Err(anyhow::anyhow!("RAG system not initialized"))
+        }
+    }
 
-        if search_results.is_empty() {
-            return Ok(
-                "I don't have specific documentation for that query in my knowledge base."
-                    .to_string(),
-            );
+    pub async fn clear_documents(&mut self) -> Result<()> {
+        if let Some(rag) = &mut self.rag {
+            rag.clear_documents().await
+        } else {
+            Err(anyhow::anyhow!("RAG system not initialized"))
+        }
+    }
+
+    // Legacy parsing methods for backward compatibility
+    pub async fn is_documentation_query(&self, input: &str) -> bool {
+        let input_lower = input.to_lowercase();
+
+        let doc_keywords = [
+            "explain how",
+            "what is the difference",
+            "how do i",
+            "how does",
+            "documentation",
+            "docs ",
+            "what are the steps",
+            "how to calculate",
+            "what does this mean",
+            "difference between",
+        ];
+
+        if doc_keywords
+            .iter()
+            .any(|&keyword| input_lower.contains(keyword))
+        {
+            return true;
         }
 
-        let mut context = String::with_capacity(4096);
-        for result in search_results.iter().take(5) {
-            write!(
-                context,
-                "Source: {} ({})\n{}\n\n---\n\n",
-                result.document.title, result.document.source, result.relevant_chunk
-            )
-            .expect("String formatting should not fail");
+        let blockchain_patterns = [
+            "much eth",
+            "much usdc",
+            "much token",
+            "eth does",
+            "usdc does",
+            "token does",
+            "balance of",
+            "balance for",
+            "send",
+            "transfer",
+            "from alice",
+            "from bob",
+            "from carol",
+            "to alice",
+            "to bob",
+            "to carol",
+            "swap",
+            "uniswap",
+            "exchange",
+        ];
+
+        if blockchain_patterns
+            .iter()
+            .any(|&pattern| input_lower.contains(pattern))
+        {
+            return false;
+        }
+
+        false
+    }
+
+    pub async fn parse_command(&self, user_input: &str) -> Result<ParsedCommand> {
+        let mut additional_context = String::new();
+        if self.is_documentation_query(user_input).await {
+            if let Ok(search_results) = self.search_docs(user_input).await {
+                if !search_results.is_empty() {
+                    additional_context = "\n\nRelevant Documentation Context:\n".to_string();
+                    for result in search_results.iter().take(5) {
+                        let chunk_preview = if result.relevant_chunk.len() > 800 {
+                            format!(
+                                "{}...",
+                                result.relevant_chunk.chars().take(800).collect::<String>()
+                            )
+                        } else {
+                            result.relevant_chunk.clone()
+                        };
+                        write!(
+                            additional_context,
+                            "Document: {} ({})\n{}\n\n",
+                            result.document.title, result.document.source, chunk_preview
+                        )
+                        .expect("String formatting should not fail");
+                    }
+                }
+            }
         }
 
         let system_prompt = format!(
-            "You are an expert on Ethereum and Uniswap. Answer the user's question based on the provided documentation context. Be accurate and specific.\n\nContext:\n{context}"
+            r#"You are an Ethereum blockchain assistant that helps users interact with the blockchain using natural language.{additional_context}
+
+Parse user requests into JSON with EXACTLY this structure. Use "action" (not "command") as the field name:
+
+For balance queries:
+{{
+  "action": "balance",
+  "address": "0x...",
+  "token": "ETH"
+}}
+
+For transfers:
+{{
+  "action": "transfer", 
+  "from_address": "0x...",
+  "to_address": "0x...",
+  "amount": "1.0"
+}}
+
+For contract checks:
+{{
+  "action": "contract_check",
+  "address": "0x..."
+}}
+
+For token swaps:
+{{
+  "action": "swap",
+  "from_address": "0x...",
+  "token_in": "ETH",
+  "token_out": "USDC", 
+  "amount_in": "10.0",
+  "slippage_bps": 200
+}}
+
+Account aliases:
+- Alice = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+- Bob = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8  
+- Carol = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+
+Convert all account names (alice, bob, carol) to their hex addresses.
+For slippage, use 200 (2%) as default if not specified.
+
+Return ONLY the JSON object, no explanations."#
         );
 
-        let messages = json!([
-            {
-                "role": "user",
-                "content": query
-            }
-        ]);
+        let messages = json!([{"role": "user", "content": user_input}]);
 
         let response = self
             .client
@@ -1072,10 +484,271 @@ IMPORTANT: Only use tools that exist in the tool registry. Always validate addre
             ));
         }
 
+        let content = response_json["content"][0]["text"].as_str().unwrap_or("{}");
+        let cleaned_content = extract_json_from_response(content);
+
+        let parsed_command: ParsedCommand = match serde_json::from_str(&cleaned_content) {
+            Ok(cmd) => cmd,
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "Failed to parse Claude response as JSON: {}\nOriginal response: {}\nCleaned response: {}",
+                    e, content, cleaned_content
+                ))
+            }
+        };
+
+        Ok(parsed_command)
+    }
+
+    #[allow(dead_code)]
+    pub fn resolve_address(&self, address: &str) -> String {
+        let lowercased = address.to_lowercase();
+        self.account_aliases
+            .get(&lowercased)
+            .cloned()
+            .unwrap_or_else(|| address.to_string())
+    }
+
+    pub async fn answer_documentation_query(&self, query: &str) -> Result<String> {
+        let search_results = self.search_docs(query).await?;
+
+        if search_results.is_empty() {
+            return Ok("I don't have specific documentation about that topic. Please try a more specific query or ingest relevant documentation first.".to_string());
+        }
+
+        let mut context = String::with_capacity(8192);
+        for result in search_results.iter().take(8) {
+            write!(
+                context,
+                "Source: {} ({})\n{}\n\n---\n\n",
+                result.document.title, result.document.source, result.relevant_chunk
+            )
+            .expect("String formatting should not fail");
+        }
+
+        let system_prompt = format!(
+            r#"You are an expert at Ethereum development and DeFi protocols. Use the provided documentation to answer the user's question comprehensively.
+
+Documentation context:
+{context}
+
+Instructions:
+- Answer based primarily on the provided documentation
+- If the documentation doesn't contain enough information, say so clearly
+- Provide practical examples when possible
+- Be accurate and don't make up information not in the context
+- Structure your response clearly with proper formatting"#
+        );
+
+        let response = self
+            .client
+            .post("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&json!({
+                "model": "claude-sonnet-4-0",
+                "max_tokens": 1024,
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": query}]
+            }))
+            .send()
+            .await?;
+
+        let response_text = response.text().await?;
+        let response_json: serde_json::Value = serde_json::from_str(&response_text)?;
+
+        if let Some(error) = response_json.get("error") {
+            return Err(anyhow::anyhow!(
+                "Claude API error: {}",
+                error
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("Unknown error")
+            ));
+        }
+
         let content = response_json["content"][0]["text"]
             .as_str()
             .unwrap_or("Unable to generate response");
-
         Ok(content.to_string())
+    }
+
+    // Modern AI agent methods
+    pub async fn plan_execution(&mut self, user_input: &str) -> Result<AgentPlan> {
+        let mut context_info = String::with_capacity(2048);
+        context_info.push_str(&self.tool_registry.get_tools_description());
+        context_info.push_str("\nAvailable test accounts:\n");
+
+        for (alias, address) in &self.account_aliases {
+            writeln!(context_info, "- {alias}: {address}")
+                .expect("String formatting should not fail");
+        }
+
+        if let Ok(search_results) = self.search_docs(user_input).await {
+            if !search_results.is_empty() {
+                context_info.push_str("\n\nRelevant Documentation:\n");
+                for result in search_results.iter().take(3) {
+                    writeln!(
+                        context_info,
+                        "- {}: {}",
+                        result.document.title,
+                        result.relevant_chunk.chars().take(200).collect::<String>()
+                    )
+                    .expect("String formatting should not fail");
+                }
+            }
+        }
+
+        let system_prompt = format!(
+            r#"You are an intelligent Ethereum blockchain agent that creates execution plans for user requests.
+
+Available context:
+{context_info}
+
+Create a detailed execution plan for the user's request. Consider:
+1. What blockchain operations are needed?
+2. Are there dependencies between steps?
+3. Does this require user confirmation (dangerous operations)?
+4. What parameters are needed for each step?
+
+Respond with JSON in this exact format:
+{{
+  "reasoning": "Explain your approach and why these steps are needed",
+  "steps": [
+    {{
+      "step_id": "step_1",
+      "description": "Human readable description of what this step does",
+      "tool_name": "get_balance",
+      "parameters": {{ "address": "0x...", "token": "ETH" }},
+      "depends_on": null
+    }}
+  ],
+  "requires_confirmation": false
+}}
+
+Available tools: get_balance, send_transfer, check_contract, execute_swap"#
+        );
+
+        let response = self
+            .client
+            .post("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&json!({
+                "model": "claude-sonnet-4-0",
+                "max_tokens": 2048,
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": user_input}]
+            }))
+            .send()
+            .await?;
+
+        let response_text = response.text().await?;
+        let response_json: serde_json::Value = serde_json::from_str(&response_text)?;
+
+        if let Some(error) = response_json.get("error") {
+            return Err(anyhow::anyhow!(
+                "Claude API error: {}",
+                error
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("Unknown error")
+            ));
+        }
+
+        let content = response_json["content"][0]["text"].as_str().unwrap_or("{}");
+        let cleaned_content = extract_json_from_response(content);
+
+        let plan: AgentPlan = serde_json::from_str(&cleaned_content)
+            .map_err(|e| anyhow::anyhow!("Failed to parse execution plan: {}", e))?;
+
+        Ok(plan)
+    }
+
+    pub async fn execute_plan(
+        &mut self,
+        plan: AgentPlan,
+        mcp_client: &mut McpClient,
+    ) -> Result<Vec<String>> {
+        let mut results = Vec::new();
+
+        for step in plan.steps {
+            let result = match step.tool_name.as_str() {
+                "get_balance" => {
+                    let address = step.parameters["address"].as_str().unwrap_or("");
+                    let token = step.parameters["token"].as_str().unwrap_or("ETH");
+                    mcp_client.get_balance(address, Some(token)).await?
+                }
+                "send_transfer" => {
+                    let from_address = step.parameters["from_address"].as_str().unwrap_or("");
+                    let to_address = step.parameters["to_address"].as_str().unwrap_or("");
+                    let amount_eth = step.parameters["amount_eth"].as_str().unwrap_or("");
+                    let private_key =
+                        self.get_private_key_for_address(from_address)
+                            .ok_or_else(|| {
+                                anyhow::anyhow!("No private key found for address {}", from_address)
+                            })?;
+
+                    mcp_client
+                        .send_transfer(from_address, to_address, amount_eth, &private_key)
+                        .await?
+                }
+                "check_contract" => {
+                    let address = step.parameters["address"].as_str().unwrap_or("");
+                    mcp_client.check_contract(address).await?
+                }
+                "execute_swap" => {
+                    let from_address = step.parameters["from_address"].as_str().unwrap_or("");
+                    let token_in = step.parameters["token_in"].as_str().unwrap_or("");
+                    let token_out = step.parameters["token_out"].as_str().unwrap_or("");
+                    let amount_in = step.parameters["amount_in"].as_str().unwrap_or("");
+                    let slippage_bps =
+                        step.parameters["slippage_bps"].as_u64().unwrap_or(200) as u16;
+                    let private_key =
+                        self.get_private_key_for_address(from_address)
+                            .ok_or_else(|| {
+                                anyhow::anyhow!("No private key found for address {}", from_address)
+                            })?;
+
+                    mcp_client
+                        .execute_swap(
+                            from_address,
+                            token_in,
+                            token_out,
+                            amount_in,
+                            slippage_bps,
+                            &private_key,
+                        )
+                        .await?
+                }
+                _ => return Err(anyhow::anyhow!("Unknown tool: {}", step.tool_name)),
+            };
+
+            self.context.step_results.insert(
+                step.step_id.clone(),
+                serde_json::Value::String(result.clone()),
+            );
+
+            results.push(format!("✅ {}: {}", step.description, result));
+        }
+
+        Ok(results)
+    }
+
+    pub fn get_private_key_for_address(&self, address: &str) -> Option<String> {
+        match address {
+            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" => Some(
+                "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string(),
+            ),
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" => Some(
+                "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d".to_string(),
+            ),
+            "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC" => Some(
+                "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a".to_string(),
+            ),
+            _ => None,
+        }
     }
 }

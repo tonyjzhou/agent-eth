@@ -1,11 +1,11 @@
-use crate::agent::EthereumAgent;
+use crate::agent::AgentCore;
 use anyhow::Result;
 use colored::*;
 
 pub struct DocsCommand;
 
 impl DocsCommand {
-    pub async fn search(query: &str, agent: &EthereumAgent) -> Result<()> {
+    pub async fn search(query: &str, agent: &AgentCore) -> Result<()> {
         println!(
             "{} {}",
             "🔍 Searching docs for:".bright_blue(),
@@ -19,7 +19,7 @@ impl DocsCommand {
         Ok(())
     }
 
-    pub async fn ingest(directory: &str, agent: &mut EthereumAgent) -> Result<()> {
+    pub async fn ingest(directory: &str, agent: &mut AgentCore) -> Result<()> {
         println!(
             "{} {}",
             "📚 Ingesting documents from:".bright_blue(),
@@ -33,7 +33,7 @@ impl DocsCommand {
         Ok(())
     }
 
-    pub async fn clear(agent: &mut EthereumAgent) -> Result<()> {
+    pub async fn clear(agent: &mut AgentCore) -> Result<()> {
         println!(
             "{}",
             "🗑️  Clearing all ingested documents...".bright_yellow()

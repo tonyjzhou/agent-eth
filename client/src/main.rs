@@ -6,7 +6,7 @@ mod mcp_client;
 mod rag;
 mod tools;
 
-use agent::{AgentCore, EthereumAgent};
+use agent::AgentCore;
 use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, Commands};
@@ -25,40 +25,22 @@ async fn main() -> Result<()> {
         env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY environment variable must be set");
 
     // Initialize components
-    let mut agent = EthereumAgent::new(&anthropic_api_key)?;
     let mut agent_core = AgentCore::new(&anthropic_api_key)?;
     let mut mcp_client = McpClient::new(&args.server_command, vec![]).await?;
 
-    // Initialize RAG system for both agents
+    // Initialize RAG system
     let rag_db_path = "client_rag.db";
-    let mut rag_initialized = false;
-    if let Err(e) = agent.initialize_rag(rag_db_path).await {
-        println!(
-            "{} Failed to initialize RAG system for legacy agent: {}",
-            "⚠️".bright_yellow(),
-            e
-        );
-    } else {
-        rag_initialized = true;
-    }
-
     if let Err(e) = agent_core.initialize_rag(rag_db_path).await {
         println!(
-            "{} Failed to initialize RAG system for intelligent agent: {}",
+            "{} Failed to initialize RAG system: {}",
             "⚠️".bright_yellow(),
             e
         );
-        if !rag_initialized {
-            println!(
-                "{}",
-                "Continuing without documentation search...".bright_yellow()
-            );
-        }
-    } else if !rag_initialized {
-        rag_initialized = true;
-    }
-
-    if rag_initialized {
+        println!(
+            "{}",
+            "Continuing without documentation search...".bright_yellow()
+        );
+    } else {
         println!("{}", "✅ RAG system initialized".bright_green());
     }
 
@@ -76,7 +58,7 @@ async fn main() -> Result<()> {
         }
         Commands::Transfer { amount, from, to } => {
             println!("{}", "🚀 Ethereum AI Agent - Transfer".bright_blue().bold());
-            TransferCommand::execute(&amount, &from, &to, &mut mcp_client, &agent).await?
+            TransferCommand::execute(&amount, &from, &to, &mut mcp_client, &agent_core).await?
         }
         Commands::ContractCheck { address } => {
             println!(
@@ -103,7 +85,7 @@ async fn main() -> Result<()> {
                 &from,
                 slippage,
                 &mut mcp_client,
-                &agent,
+                &agent_core,
             )
             .await?
         }
@@ -114,7 +96,7 @@ async fn main() -> Result<()> {
                     .bright_blue()
                     .bold()
             );
-            DocsCommand::search(&query, &agent).await?
+            DocsCommand::search(&query, &agent_core).await?
         }
         Commands::Ingest { directory } => {
             println!(
@@ -123,7 +105,7 @@ async fn main() -> Result<()> {
                     .bright_blue()
                     .bold()
             );
-            DocsCommand::ingest(&directory, &mut agent).await?
+            DocsCommand::ingest(&directory, &mut agent_core).await?
         }
         Commands::Clear => {
             println!(
@@ -132,7 +114,7 @@ async fn main() -> Result<()> {
                     .bright_blue()
                     .bold()
             );
-            DocsCommand::clear(&mut agent).await?
+            DocsCommand::clear(&mut agent_core).await?
         }
         Commands::Interactive => {
             println!(
@@ -141,7 +123,7 @@ async fn main() -> Result<()> {
                     .bright_blue()
                     .bold()
             );
-            InteractiveCommand::start(&mut agent, &mut agent_core, &mut mcp_client).await?
+            InteractiveCommand::start(&mut agent_core, &mut mcp_client).await?
         }
         Commands::Agent { command } => {
             println!(
