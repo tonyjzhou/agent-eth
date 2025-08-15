@@ -58,6 +58,11 @@ pub struct AddressResolver {
 }
 
 impl AddressResolver {
+    /// Creates a new address resolver instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP client cannot be initialized.
     pub fn new() -> Result<Self> {
         let client = Client::new();
         let cache = Arc::new(Mutex::new(HashMap::new()));
@@ -75,6 +80,13 @@ impl AddressResolver {
     }
 
     /// Get Uniswap V2 Router address for the specified network
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Network API requests fail
+    /// - Address parsing fails
+    /// - Cache lock cannot be acquired
     pub async fn get_uniswap_v2_router(&self, network: Network) -> Result<Address> {
         let cache_key = format!("uniswap_v2_router_{}", network.name());
 
@@ -107,6 +119,13 @@ impl AddressResolver {
     }
 
     /// Get WETH address for the specified network
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Network API requests fail
+    /// - Address parsing fails
+    /// - Cache lock cannot be acquired
     pub async fn get_weth_address(&self, network: Network) -> Result<Address> {
         let cache_key = format!("weth_{}", network.name());
 

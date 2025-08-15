@@ -17,6 +17,17 @@ pub struct SwapParams {
     pub private_key: String,
 }
 
+/// Executes a token swap using Uniswap V2 Router.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Contract interaction setup fails
+/// - Token amount parsing fails
+/// - Address parsing fails
+/// - Token approval fails
+/// - Swap transaction fails
+/// - RPC provider requests fail
 pub async fn execute_swap(provider: &EthereumProvider, params: SwapParams) -> Result<String> {
     info!(
         "Executing swap: {} {} -> {}",

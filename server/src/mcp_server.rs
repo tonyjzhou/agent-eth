@@ -18,6 +18,13 @@ pub struct EthereumToolRouter {
 
 #[tool_router]
 impl EthereumToolRouter {
+    /// Creates a new Ethereum tool router.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - RPC URL environment variable is invalid
+    /// - Ethereum provider initialization fails
     pub fn new() -> Result<Self> {
         let rpc_url = env::var("RPC_URL").unwrap_or_else(|_| "http://127.0.0.1:8545".to_string());
         let provider = EthereumProvider::new(&rpc_url)?;

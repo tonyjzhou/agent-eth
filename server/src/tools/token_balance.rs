@@ -7,6 +7,14 @@ use anyhow::Result;
 use std::str::FromStr;
 use tracing::debug;
 
+/// Gets the token balance for a given address and token symbol.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Address parsing fails
+/// - Provider balance request fails
+/// - Token balance calculation fails
 pub async fn get_token_balance(
     provider: &EthereumProvider,
     user_address: String,

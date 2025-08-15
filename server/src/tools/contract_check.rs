@@ -2,6 +2,14 @@ use crate::error::ServerError;
 use crate::provider::EthereumProvider;
 use anyhow::Result;
 
+/// Checks if a contract is deployed at the given address.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Provider fails to retrieve bytecode
+/// - Address parsing fails
+/// - Network request fails
 pub async fn check_contract_deployed(
     provider: &EthereumProvider,
     address: String,

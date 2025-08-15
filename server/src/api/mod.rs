@@ -22,6 +22,13 @@ pub struct ApiClient {
 }
 
 impl ApiClient {
+    /// Creates a new API client instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - HTTP client cannot be initialized
+    /// - Address resolver initialization fails
     pub fn new() -> Result<Self> {
         let client = Client::new();
         let brave_api_key = env::var("BRAVE_API_KEY").ok();
@@ -38,6 +45,14 @@ impl ApiClient {
         })
     }
 
+    /// Searches for contract addresses using available APIs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Network requests to search APIs fail
+    /// - JSON parsing of search results fails
+    /// - Address parsing fails
     pub async fn search_contract_address(&self, query: &str) -> Result<Vec<ContractAddress>> {
         if let Some(api_key) = &self.brave_api_key {
             self.brave_search(query, api_key).await

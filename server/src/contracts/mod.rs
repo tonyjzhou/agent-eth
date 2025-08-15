@@ -55,6 +55,11 @@ pub struct ContractInteraction {
 }
 
 impl ContractInteraction {
+    /// Creates a new contract interaction instance with hardcoded addresses.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the hardcoded contract addresses cannot be parsed.
     #[allow(dead_code)]
     pub fn new() -> Result<Self> {
         // Use fallback hardcoded addresses for backward compatibility
@@ -67,6 +72,14 @@ impl ContractInteraction {
         })
     }
 
+    /// Creates a new contract interaction instance using address resolver.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Address resolver initialization fails
+    /// - Network address lookup fails
+    /// - Contract address parsing fails
     pub async fn new_with_resolver(network: Network) -> Result<Self> {
         let resolver = AddressResolver::new()?;
         let router_address = resolver.get_uniswap_v2_router(network.clone()).await?;
@@ -78,6 +91,11 @@ impl ContractInteraction {
         })
     }
 
+    /// Encodes a swap exact ETH for tokens transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if ABI encoding fails.
     pub fn encode_swap_exact_eth_for_tokens(
         &self,
         amount_out_min: U256,
@@ -94,6 +112,11 @@ impl ContractInteraction {
         Ok(call.abi_encode())
     }
 
+    /// Encodes an ERC20 approve transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if ABI encoding fails.
     pub fn encode_erc20_approve(&self, spender: Address, amount: U256) -> Result<Vec<u8>> {
         let call = IERC20::approveCall {
             spender,
@@ -102,6 +125,11 @@ impl ContractInteraction {
         Ok(call.abi_encode())
     }
 
+    /// Encodes an ERC20 balance query.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if ABI encoding fails.
     #[allow(dead_code)]
     pub fn encode_erc20_balance_of(&self, owner: Address) -> Result<Vec<u8>> {
         let call = IERC20::balanceOfCall { account: owner };
@@ -138,6 +166,11 @@ impl ContractInteraction {
         (amount_in * slippage_factor) / U256::from(10000)
     }
 
+    /// Encodes a swap exact tokens for ETH transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if ABI encoding fails.
     pub fn encode_swap_exact_tokens_for_eth(
         &self,
         amount_in: U256,
@@ -156,6 +189,11 @@ impl ContractInteraction {
         Ok(call.abi_encode())
     }
 
+    /// Encodes a swap exact tokens for tokens transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if ABI encoding fails.
     pub fn encode_swap_exact_tokens_for_tokens(
         &self,
         amount_in: U256,
@@ -174,6 +212,11 @@ impl ContractInteraction {
         Ok(call.abi_encode())
     }
 
+    /// Encodes a get amounts out query.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if ABI encoding fails.
     pub fn encode_get_amounts_out(&self, amount_in: U256, path: Vec<Address>) -> Result<Vec<u8>> {
         let call = IUniswapV2Router02::getAmountsOutCall {
             amountIn: amount_in,

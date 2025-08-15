@@ -13,12 +13,26 @@ pub struct EthereumProvider {
 }
 
 impl EthereumProvider {
+    /// Creates a new Ethereum provider instance.
+    ///
+    /// # Errors
+    ///
+    /// Currently does not return errors, but returns `Result` for future compatibility.
     pub fn new(rpc_url: &str) -> Result<Self> {
         Ok(Self {
             rpc_url: rpc_url.to_string(),
         })
     }
 
+    /// Gets the ETH balance for the given address.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Address parsing fails
+    /// - RPC URL parsing fails
+    /// - Network request to RPC provider fails
+    /// - ENS names are provided (not supported)
     pub async fn get_balance(&self, address: &str) -> Result<U256> {
         let addr = if address.ends_with(".eth") {
             // For now, provide a helpful error message for ENS names
@@ -35,6 +49,15 @@ impl EthereumProvider {
         Ok(balance)
     }
 
+    /// Gets the bytecode at the given address.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Address parsing fails
+    /// - RPC URL parsing fails
+    /// - Network request to RPC provider fails
+    /// - ENS names are provided (not supported)
     pub async fn get_code(&self, address: &str) -> Result<Vec<u8>> {
         let addr = if address.ends_with(".eth") {
             // For now, provide a helpful error message for ENS names
@@ -50,6 +73,18 @@ impl EthereumProvider {
         Ok(code.to_vec())
     }
 
+    /// Sends an ETH transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Address parsing fails
+    /// - Amount parsing fails
+    /// - Private key parsing fails
+    /// - Private key doesn't match from address
+    /// - RPC URL parsing fails
+    /// - Transaction submission fails
+    /// - Transaction mining fails
     pub async fn send_transaction(
         &self,
         from_address: &str,
@@ -100,6 +135,19 @@ impl EthereumProvider {
         Ok(format!("{tx_hash:#x}"))
     }
 
+    /// Sends a contract transaction with calldata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Address parsing fails
+    /// - Value parsing fails
+    /// - Calldata hex decoding fails
+    /// - Private key parsing fails
+    /// - Private key doesn't match from address
+    /// - RPC URL parsing fails
+    /// - Transaction submission fails
+    /// - Transaction mining fails
     pub async fn send_contract_transaction(
         &self,
         from_address: &str,
@@ -158,6 +206,15 @@ impl EthereumProvider {
         Ok(format!("{tx_hash:#x}"))
     }
 
+    /// Performs a read-only contract call.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Contract address parsing fails
+    /// - Calldata hex decoding fails
+    /// - RPC URL parsing fails
+    /// - Contract call fails
     pub async fn call_contract(&self, contract_address: &str, calldata: &str) -> Result<String> {
         let contract_addr = Address::from_str(contract_address)?;
         let data = hex::decode(calldata)?.into();

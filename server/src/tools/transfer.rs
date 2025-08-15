@@ -1,6 +1,16 @@
 use crate::provider::EthereumProvider;
 use anyhow::Result;
 
+/// Sends an ETH transfer transaction.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Address parsing fails
+/// - Amount parsing fails
+/// - Private key validation fails
+/// - Transaction submission fails
+/// - Provider communication fails
 pub async fn send_eth_transfer(
     provider: &EthereumProvider,
     from_address: String,
