@@ -2,9 +2,11 @@ use crate::error::AgentError;
 use anyhow::Result;
 use serde_json::{json, Value};
 use std::process::Stdio;
+use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
-use tracing::info;
+use tokio::time::timeout;
+use tracing::{error, info, warn};
 
 pub struct McpClient {
     process: Child,
@@ -27,7 +29,7 @@ impl McpClient {
             request_id: 1,
         };
 
-        // Initialize the MCP connection
+        // Initialize the MCP connection with proper JSON-RPC 2.0
         client.initialize().await?;
 
         Ok(client)
@@ -39,7 +41,7 @@ impl McpClient {
             "id": self.request_id,
             "method": "initialize",
             "params": {
-                "protocolVersion": "2025-06-18",
+                "protocolVersion": "2024-11-05",
                 "capabilities": {},
                 "clientInfo": {
                     "name": "agent-eth-client",
@@ -51,7 +53,7 @@ impl McpClient {
         self.send_request(init_request).await?;
         self.request_id += 1;
 
-        // Send initialized notification
+        // Send initialized notification (JSON-RPC 2.0 notification)
         let initialized_notification = json!({
             "jsonrpc": "2.0",
             "method": "notifications/initialized"
@@ -74,25 +76,43 @@ impl McpClient {
             return Err(AgentError::mcp("Server process has no stdin").into());
         }
 
-        // Read response
+        // Read response with timeout and better error handling
         if let Some(stdout) = self.process.stdout.as_mut() {
             let mut reader = BufReader::new(stdout);
             let mut line = String::new();
-            reader.read_line(&mut line).await?;
 
-            tracing::debug!("Raw server response: {:?}", line);
+            // Add timeout to prevent hanging
+            match timeout(Duration::from_secs(30), reader.read_line(&mut line)).await {
+                Ok(Ok(0)) => {
+                    error!("Server closed stdout unexpectedly");
+                    Err(AgentError::mcp("Server closed stdout").into())
+                }
+                Ok(Ok(_)) => {
+                    tracing::debug!("Raw server response: {:?}", line);
 
-            if !line.is_empty() {
-                let response: Value = serde_json::from_str(line.trim()).map_err(|e| {
-                    anyhow::anyhow!(
-                        "Failed to parse server response as JSON: {}. Response was: '{}'",
-                        e,
-                        line.trim()
-                    )
-                })?;
-                Ok(response)
-            } else {
-                Err(AgentError::mcp("Empty response from server").into())
+                    if !line.trim().is_empty() {
+                        let response: Value = serde_json::from_str(line.trim()).map_err(|e| {
+                            error!("JSON parse error: {}, raw response: '{}'", e, line.trim());
+                            anyhow::anyhow!(
+                                "Failed to parse server response as JSON: {}. Response was: '{}'",
+                                e,
+                                line.trim()
+                            )
+                        })?;
+                        Ok(response)
+                    } else {
+                        warn!("Received empty response from server");
+                        Err(AgentError::mcp("Empty response from server").into())
+                    }
+                }
+                Ok(Err(e)) => {
+                    error!("IO error reading from server: {}", e);
+                    Err(AgentError::mcp(format!("Failed to read from server: {e}")).into())
+                }
+                Err(_) => {
+                    error!("Timeout waiting for server response");
+                    Err(AgentError::mcp("Timeout waiting for server response".to_string()).into())
+                }
             }
         } else {
             Err(AgentError::mcp("Server process has no stdout").into())
@@ -112,7 +132,26 @@ impl McpClient {
         Ok(())
     }
 
+    /// Check if the server process is still running
+    pub fn is_healthy(&mut self) -> bool {
+        match self.process.try_wait() {
+            Ok(Some(_)) => {
+                warn!("MCP server process has exited");
+                false
+            }
+            Ok(None) => true, // Still running
+            Err(e) => {
+                error!("Error checking server process status: {}", e);
+                false
+            }
+        }
+    }
+
     async fn call_tool(&mut self, tool_name: &str, arguments: Value) -> Result<String> {
+        // Check if server is still healthy before making calls
+        if !self.is_healthy() {
+            return Err(AgentError::mcp("MCP server process is not running").into());
+        }
         let request = json!({
             "jsonrpc": "2.0",
             "id": self.request_id,
@@ -132,7 +171,7 @@ impl McpClient {
             serde_json::to_string_pretty(&response).unwrap_or_default()
         );
 
-        // Extract the result from the response
+        // Extract the result from the response (proper JSON-RPC 2.0 handling)
         if let Some(result) = response.get("result") {
             if let Some(content) = result.get("content") {
                 if let Some(content_array) = content.as_array() {
@@ -145,13 +184,14 @@ impl McpClient {
             }
         }
 
-        // Handle error response
+        // Handle error response (JSON-RPC 2.0 error format)
         if let Some(error) = response.get("error") {
+            let error_code = error.get("code").and_then(|c| c.as_i64()).unwrap_or(-1);
             let error_msg = error
                 .get("message")
                 .and_then(|m| m.as_str())
                 .unwrap_or("Unknown error");
-            return Err(AgentError::mcp(format!("MCP error: {error_msg}")).into());
+            return Err(AgentError::mcp(format!("MCP error {error_code}: {error_msg}")).into());
         }
 
         // Debug: Show what we received instead
@@ -223,7 +263,17 @@ impl McpClient {
 
 impl Drop for McpClient {
     fn drop(&mut self) {
-        // Use explicit drop to handle the future returned by kill()
+        info!("Shutting down MCP client");
+
+        // Graceful shutdown: close stdin to signal shutdown
+        if let Some(stdin) = self.process.stdin.take() {
+            drop(stdin); // Close stdin to signal the server to shutdown gracefully
+        }
+
+        // Force terminate if still running
         std::mem::drop(self.process.kill());
+
+        // Give it a moment to cleanup
+        std::thread::sleep(Duration::from_millis(100));
     }
 }
