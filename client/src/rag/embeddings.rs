@@ -75,7 +75,8 @@ impl EmbeddingService {
                 total_batches,
                 chunk.len()
             );
-            std::io::Write::flush(&mut std::io::stdout()).unwrap();
+            // Ignore stdout flush errors for non-critical logging
+            let _ = std::io::Write::flush(&mut std::io::stdout());
             let request = EmbeddingBatchRequest {
                 input: chunk.to_vec(),
                 model: self.model.clone(),

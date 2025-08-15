@@ -248,11 +248,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_uniswap_v2_router_ethereum() {
-        let resolver = AddressResolver::new().unwrap();
+        let resolver = AddressResolver::new().expect("Failed to create resolver for test");
         let address = resolver.get_uniswap_v2_router(Network::Ethereum).await;
         assert!(address.is_ok());
 
-        let addr = address.unwrap();
+        let addr = address.expect("Expected valid router address");
         // Alloy returns addresses in lowercase
         assert_eq!(
             addr.to_string().to_lowercase(),
@@ -262,11 +262,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_weth_address_ethereum() {
-        let resolver = AddressResolver::new().unwrap();
+        let resolver = AddressResolver::new().expect("Failed to create resolver for test");
         let address = resolver.get_weth_address(Network::Ethereum).await;
         assert!(address.is_ok());
 
-        let addr = address.unwrap();
+        let addr = address.expect("Expected valid WETH address");
         // Alloy returns addresses in lowercase
         assert_eq!(
             addr.to_string().to_lowercase(),
@@ -284,19 +284,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_caching_functionality() {
-        let resolver = AddressResolver::new().unwrap();
+        let resolver = AddressResolver::new().expect("Failed to create resolver for test");
 
         // First call should populate cache
         let addr1 = resolver
             .get_uniswap_v2_router(Network::Ethereum)
             .await
-            .unwrap();
+            .expect("Failed to get router address on first call");
 
         // Second call should use cache
         let addr2 = resolver
             .get_uniswap_v2_router(Network::Ethereum)
             .await
-            .unwrap();
+            .expect("Failed to get router address on second call");
 
         assert_eq!(addr1, addr2);
     }

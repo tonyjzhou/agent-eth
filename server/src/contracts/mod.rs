@@ -127,7 +127,7 @@ impl ContractInteraction {
     pub fn calculate_deadline(&self) -> U256 {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("System time is before UNIX epoch")
             .as_secs();
 
         U256::from(now + 1800)
@@ -195,8 +195,10 @@ mod tests {
 
     #[test]
     fn test_swap_path_creation() {
-        let contracts = ContractInteraction::new().unwrap();
-        let usdc_address = Address::from_str("0xA0b86a33E6441Fd1fd8e60dd20f4c50Ff1eeF0A8").unwrap();
+        let contracts =
+            ContractInteraction::new().expect("Failed to create contract interaction for test");
+        let usdc_address = Address::from_str("0xA0b86a33E6441Fd1fd8e60dd20f4c50Ff1eeF0A8")
+            .expect("Failed to parse USDC address for test");
 
         let path = contracts.get_swap_path_eth_to_token(usdc_address);
         assert_eq!(path.len(), 2);
@@ -206,12 +208,13 @@ mod tests {
 
     #[test]
     fn test_deadline_calculation() {
-        let contracts = ContractInteraction::new().unwrap();
+        let contracts =
+            ContractInteraction::new().expect("Failed to create contract interaction for test");
         let deadline = contracts.calculate_deadline();
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("System time is before UNIX epoch")
             .as_secs();
 
         let expected_min = U256::from(now + 1700);
@@ -222,7 +225,8 @@ mod tests {
 
     #[test]
     fn test_slippage_calculation() {
-        let contracts = ContractInteraction::new().unwrap();
+        let contracts =
+            ContractInteraction::new().expect("Failed to create contract interaction for test");
         let amount_in = U256::from(1000);
         let slippage_bps = 200;
 

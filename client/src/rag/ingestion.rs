@@ -65,7 +65,8 @@ impl DocumentIngestion {
 
             if ingested_count % 50 == 0 {
                 print!("✅ Stored {ingested_count}/{total_docs} documents\r");
-                std::io::Write::flush(&mut std::io::stdout()).unwrap();
+                // Ignore stdout flush errors for non-critical logging
+                let _ = std::io::Write::flush(&mut std::io::stdout());
             }
         }
         println!("✅ Stored {ingested_count} documents");

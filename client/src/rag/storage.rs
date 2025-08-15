@@ -106,7 +106,8 @@ impl VectorStorage {
         }
 
         // Sort by score (descending) and take top results
-        scored_results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        // Handle NaN scores by treating them as lowest priority
+        scored_results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Less));
         scored_results.truncate(limit);
 
         let search_results = scored_results

@@ -149,7 +149,7 @@ mod tests {
 
     #[test]
     fn test_extract_ethereum_address() {
-        let client = ApiClient::new().unwrap();
+        let client = ApiClient::new().expect("Failed to create API client for test");
         let text = "The Uniswap V2 Router contract is at 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D on Ethereum";
         let address = client.extract_ethereum_address(text);
         assert_eq!(
@@ -160,10 +160,10 @@ mod tests {
 
     #[test]
     fn test_fallback_contract_search() {
-        let client = ApiClient::new().unwrap();
+        let client = ApiClient::new().expect("Failed to create API client for test");
         let result = tokio_test::block_on(client.fallback_contract_search("uniswap v2 router"));
         assert!(result.is_ok());
-        let addresses = result.unwrap();
+        let addresses = result.expect("Expected valid contract addresses");
         assert!(!addresses.is_empty());
         assert_eq!(
             addresses[0].address,

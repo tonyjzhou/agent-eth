@@ -185,20 +185,22 @@ mod tests {
 
     #[test]
     fn test_ens_name_detection() {
-        let provider = EthereumProvider::new("http://127.0.0.1:8545").unwrap();
+        let provider = EthereumProvider::new("http://127.0.0.1:8545")
+            .expect("Failed to create provider for test");
 
         // Test that ENS names are properly detected and rejected with helpful error
         let result = tokio_test::block_on(provider.get_balance("vitalik.eth"));
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("ENS name resolution"));
+        let error_msg = result
+            .expect_err("Expected ENS error but got success")
+            .to_string();
+        assert!(error_msg.contains("ENS name resolution"));
     }
 
     #[test]
     fn test_invalid_address_format() {
-        let provider = EthereumProvider::new("http://127.0.0.1:8545").unwrap();
+        let provider = EthereumProvider::new("http://127.0.0.1:8545")
+            .expect("Failed to create provider for test");
 
         // Test invalid hex address
         let result = tokio_test::block_on(provider.get_balance("invalid_address"));
