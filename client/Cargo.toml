@@ -31,3 +31,4 @@ rusqlite = { version = "0.31.0", features = ["bundled"] }
 
 # Error handling
 thiserror = "1.0"
+async-trait = "0.1"
