@@ -2,6 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::Write;
 
 pub mod balance;
 pub mod contract_check;
@@ -98,8 +99,10 @@ impl TypedToolRegistry {
         description.push_str("Available blockchain tools:\n");
 
         for tool in self.tools.values() {
-            description.push_str(&format!("\n- {}: {}\n", tool.name(), tool.description()));
-            description.push_str(&format!("  Schema: {}\n", tool.input_schema()));
+            write!(description, "\n- {}: {}\n", tool.name(), tool.description())
+                .expect("String formatting should not fail");
+            writeln!(description, "  Schema: {}", tool.input_schema())
+                .expect("String formatting should not fail");
         }
 
         description

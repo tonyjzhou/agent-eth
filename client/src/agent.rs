@@ -7,6 +7,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
+use std::fmt::Write;
 
 #[derive(Debug, Clone)]
 pub struct EthereumAgent {
@@ -252,10 +253,12 @@ impl EthereumAgent {
                         } else {
                             result.relevant_chunk.clone()
                         };
-                        additional_context.push_str(&format!(
+                        write!(
+                            additional_context,
                             "Document: {} ({})\n{}\n\n",
                             result.document.title, result.document.source, chunk_preview
-                        ));
+                        )
+                        .expect("String formatting should not fail");
                     }
                 }
             }
@@ -380,12 +383,13 @@ IMPORTANT: Always use "action" as the field name, never "command". Response must
             }
         }
 
-        let parsed: ParsedCommand = serde_json::from_value(json_value.clone()).map_err(|e| {
+        let json_value_for_error = json_value.clone(); // Keep clone only for error message
+        let parsed: ParsedCommand = serde_json::from_value(json_value).map_err(|e| {
             AgentError::command_parsing(format!(
                 "Failed to parse normalized JSON as ParsedCommand: {}\nOriginal response: {}\nNormalized JSON: {}",
                 e,
                 content,
-                serde_json::to_string_pretty(&json_value).unwrap_or_default()
+                serde_json::to_string_pretty(&json_value_for_error).unwrap_or_default()
             ))
         })?;
 
@@ -421,12 +425,14 @@ IMPORTANT: Always use "action" as the field name, never "command". Response must
         }
 
         // Build context from search results - use more results since chunks are better organized
-        let mut context = String::new();
+        let mut context = String::with_capacity(8192);
         for result in search_results.iter().take(8) {
-            context.push_str(&format!(
+            write!(
+                context,
                 "Source: {} ({})\n{}\n\n---\n\n",
                 result.document.title, result.document.source, result.relevant_chunk
-            ));
+            )
+            .expect("String formatting should not fail");
         }
 
         let system_prompt = format!(
@@ -613,11 +619,13 @@ impl ToolRegistry {
     }
 
     pub fn get_tools_description(&self) -> String {
-        let mut description = String::new();
+        // Pre-allocate capacity for better performance
+        let mut description = String::with_capacity(1024);
         description.push_str("Available blockchain tools:\n");
 
         for tool in self.tools.values() {
-            description.push_str(&format!("\n- {}: {}\n", tool.name, tool.description));
+            write!(description, "\n- {}: {}\n", tool.name, tool.description)
+                .expect("String formatting should not fail");
             description.push_str("  Parameters:\n");
             for param in &tool.parameters {
                 let required_str = if param.required {
@@ -625,10 +633,12 @@ impl ToolRegistry {
                 } else {
                     "(optional)"
                 };
-                description.push_str(&format!(
-                    "    - {} {}: {} {}\n",
+                writeln!(
+                    description,
+                    "    - {} {}: {} {}",
                     param.name, param.param_type, param.description, required_str
-                ));
+                )
+                .expect("String formatting should not fail");
             }
         }
 
@@ -679,7 +689,7 @@ impl AgentCore {
 
     pub async fn plan_execution(&mut self, user_input: &str) -> Result<AgentPlan> {
         // Build context for the AI agent
-        let mut context_info = String::new();
+        let mut context_info = String::with_capacity(2048);
 
         // Add tool registry info
         context_info.push_str(&self.tool_registry.get_tools_description());
@@ -687,14 +697,15 @@ impl AgentCore {
         // Add account aliases
         context_info.push_str("\nAvailable test accounts:\n");
         for (alias, address) in &self.account_aliases {
-            context_info.push_str(&format!("- {alias}: {address}\n"));
+            writeln!(context_info, "- {alias}: {address}")
+                .expect("String formatting should not fail");
         }
 
         // Add session memory if any
         if !self.context.session_memory.is_empty() {
             context_info.push_str("\nRecent operations in this session:\n");
             for memory in self.context.session_memory.iter().rev().take(5) {
-                context_info.push_str(&format!("- {memory}\n"));
+                writeln!(context_info, "- {memory}").expect("String formatting should not fail");
             }
         }
 
@@ -712,8 +723,8 @@ impl AgentCore {
                         } else {
                             result.relevant_chunk.clone()
                         };
-                        context_info
-                            .push_str(&format!("- {}: {}\n", result.document.title, preview));
+                        writeln!(context_info, "- {}: {}", result.document.title, preview)
+                            .expect("String formatting should not fail");
                     }
                 }
             }
@@ -1012,12 +1023,14 @@ IMPORTANT: Only use tools that exist in the tool registry. Always validate addre
             );
         }
 
-        let mut context = String::new();
+        let mut context = String::with_capacity(4096);
         for result in search_results.iter().take(5) {
-            context.push_str(&format!(
+            write!(
+                context,
                 "Source: {} ({})\n{}\n\n---\n\n",
                 result.document.title, result.document.source, result.relevant_chunk
-            ));
+            )
+            .expect("String formatting should not fail");
         }
 
         let system_prompt = format!(

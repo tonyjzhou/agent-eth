@@ -7,6 +7,7 @@ use crate::infrastructure::ai::claude_client::{extract_json_from_response, Claud
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::sync::Arc;
 
 pub struct IntelligentAgent<E: EthereumService, A: AccountService> {
@@ -40,7 +41,8 @@ impl<E: EthereumService, A: AccountService> IntelligentAgent<E, A> {
         context.push_str("Available test accounts:\n");
         for account in self.account_service.get_all_accounts() {
             if let Some(alias) = &account.alias {
-                context.push_str(&format!("- {}: {}\n", alias, account.address));
+                writeln!(context, "- {}: {}", alias, account.address)
+                    .expect("String formatting should not fail");
             }
         }
 
@@ -48,7 +50,7 @@ impl<E: EthereumService, A: AccountService> IntelligentAgent<E, A> {
         if !self.session_memory.is_empty() {
             context.push_str("\nRecent operations:\n");
             for memory in self.session_memory.iter().rev().take(5) {
-                context.push_str(&format!("- {memory}\n"));
+                writeln!(context, "- {memory}").expect("String formatting should not fail");
             }
         }
 
