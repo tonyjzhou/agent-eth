@@ -6,3 +6,4 @@ pub mod infrastructure;
 pub mod mcp_client;
 pub mod presentation;
 pub mod rag;
+pub mod tools;

@@ -4,6 +4,7 @@ mod commands;
 mod error;
 mod mcp_client;
 mod rag;
+mod tools;
 
 use agent::{AgentCore, EthereumAgent};
 use anyhow::Result;

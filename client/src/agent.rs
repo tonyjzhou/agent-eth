@@ -1,6 +1,7 @@
 use crate::error::AgentError;
 use crate::mcp_client::McpClient;
 use crate::rag::RagSystem;
+use crate::tools::TypedToolRegistry;
 use anyhow::Result;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -61,6 +62,8 @@ pub struct AgentCore {
     rag: Option<RagSystem>,
     context: ExecutionContext,
     tool_registry: ToolRegistry,
+    #[allow(dead_code)]
+    typed_tools: TypedToolRegistry,
 }
 
 #[derive(Debug, Clone)]
@@ -664,6 +667,7 @@ impl AgentCore {
             rag: None,
             context,
             tool_registry: ToolRegistry::new(),
+            typed_tools: TypedToolRegistry::new(),
         })
     }
 
@@ -958,6 +962,34 @@ IMPORTANT: Only use tools that exist in the tool registry. Always validate addre
             ),
             _ => None,
         }
+    }
+
+    /// Execute tool using the new structured tool system
+    #[allow(dead_code)]
+    pub async fn execute_typed_tool(
+        &self,
+        name: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        self.typed_tools.execute_tool(name, params).await
+    }
+
+    /// Get structured tool descriptions for AI agent
+    #[allow(dead_code)]
+    pub fn get_typed_tools_description(&self) -> String {
+        self.typed_tools.get_tools_description()
+    }
+
+    /// Check if a tool exists in the typed registry
+    #[allow(dead_code)]
+    pub fn has_typed_tool(&self, name: &str) -> bool {
+        self.typed_tools.get_tool(name).is_some()
+    }
+
+    /// List all available typed tools
+    #[allow(dead_code)]
+    pub fn list_typed_tools(&self) -> Vec<String> {
+        self.typed_tools.tool_names()
     }
 
     // Delegation methods for RAG functionality
